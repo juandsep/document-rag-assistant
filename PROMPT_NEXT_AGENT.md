@@ -1,49 +1,82 @@
-PROMPT PARA EL SIGUIENTE AGENTE — Sistema Documental RAG (rag) → AWS
+# Next-agent prompt — build the RAG chain and deploy on AWS
 
-CONTEXTO
-- Repo: juandsep/document-rag-assistant (trabaja SOLO dentro de esa carpeta).
-- Proyecto Python gestionado con `uv` (pyproject.toml + uv.lock). Entry: `uv run rag`.
-- Estado actual: scaffolding funcional.
-  src/rag/{__init__,api,ingest,retrievers,monitoring,ui}.py · tests/test_rag.py (5 passed) ·
-  scripts/index_docs.py · Dockerfile · README.md · PLAN.md · infra/README.md ·
-  .github/workflows/ci.yml · pyproject.toml.
-- Ya existe chunking funcional (`ingest.chunk_text`) y adaptadores Pinecone/OpenSearch
-  como placeholders (`retrievers.py`). La cadena RAG real y el despliegue aún NO están hechos.
-- Despliegue objetivo: AWS (ECS Fargate). No toques otros repos.
-  Referencia de estructura/CI: the uplift-modeling-pipeline project.
+Copy everything below the line into the next agent's first message.
 
-OBJETIVO
-Implementar la cadena RAG completa y dejarla desplegable en AWS con CI/CD.
+---
 
-STACK A USAR
-- Cómputo: ECS Fargate (servicios `rag-api` y `rag-ui`) detrás de un ALB.
-- Imágenes: ECR. Secretos: AWS Secrets Manager. Corpus: S3.
-- Vector DB: Pinecone (externo) u OpenSearch Service, seleccionable por VECTOR_BACKEND.
-- Observabilidad: CloudWatch Logs + métricas; tracing de la cadena en MLflow.
-- LLM: proveedor configurable (OPENAI_API_KEY u otro) vía secreto.
-- CI/CD: GitHub Actions con OIDC a AWS (aws-actions/configure-aws-credentials), sin claves estáticas.
+CONTEXT
 
-TAREAS (en orden)
-1. Crea la rama `feat/rag-pipeline` a partir de `dev`.
-2. Implementa `src/rag/retrievers.py`: upsert y query reales para Pinecone y OpenSearch
-   (embeddings con el proveedor configurado). Selección por `VECTOR_BACKEND`.
-3. Implementa la cadena RAG: `src/rag/chain.py` (retriever → prompt → LLM → respuesta con fuentes citadas).
-4. Completa `src/rag/api.py`: `POST /query` (Pydantic), `GET /health`, manejo de errores; conecta la cadena y el tracing.
-5. Instrumenta `src/rag/monitoring.py` con MLflow: top-k, scores, latencia, tokens; script de evaluación offline (precision@k / recall@k) sobre un set pequeño.
-6. Ajusta `src/rag/ui.py` (Streamlit) para consumir la API y mostrar fuentes.
-7. Añade deps necesarias con `uv add` (p. ej. openai, sentence-transformers/tiktoken, boto3) y actualiza uv.lock.
-8. Infra AWS: reescribe infra/README.md y añade Terraform (provider aws): infra/{main.tf,variables.tf,outputs.tf,terraform.tfvars.example} con ECR, cluster ECS Fargate, task definitions y servicios (api + ui), ALB, Secrets Manager, bucket S3 del corpus, roles IAM.
-9. Actualiza .github/workflows/ci.yml: job `test` (uv sync + pytest) y job `deploy` (build → push a ECR → `aws ecs update-service`), deploy solo en push a `dev`.
-10. Verifica en local: `uv sync && uv run pytest -q` (verde), `docker build -t rag .` (OK) y `uv run rag` levanta la API (smoke test de `/health`).
+- Repository: juandsep/document-rag-assistant (local folder name is `rag`; the GitHub repo is
+  `juandsep/document-rag-assistant`). Work only inside that folder.
+- Python project managed with **uv** (`pyproject.toml` + `uv.lock`). Console script: `uv run rag`.
+- Branch model: `main` (releases) ← `dev` (integration) ← topic branches cut from `dev`.
+  Cut your branch from `dev`; `main` only receives PRs from `dev`.
+- Current state (all green: `uv run pytest -q`, `uv run ruff check .`, docker build):
+  - `src/rag/{__init__,api,ingest,retrievers,monitoring,ui}.py` — FastAPI app with `POST /query`
+    and `/health`, working sliding-window chunking, Pinecone/OpenSearch adapter skeletons,
+    MLflow trace helpers and a Streamlit UI.
+  - `tests/unit/` and `tests/integration/` (TestClient, no external services).
+  - `scripts/index_docs.py`, `docker/Dockerfile` (multi-stage, non-root, healthcheck),
+    `docs/architecture.md`, `infra/`, `PLAN.md`, `CONTRIBUTING.md`.
+  - `.github/workflows/ci.yml` — test job (uv sync --locked, ruff, pytest) and a docker build job.
+  - Not implemented yet: real vector upsert/query, the retrieval chain, the LLM call,
+    offline evaluation and any AWS infrastructure.
+- Reference for structure and conventions: the uplift-modeling-pipeline project.
+  Mirror its layout, its CI shape, its CONTRIBUTING conventions and its Dockerfile pattern.
 
-REGLAS
-- Git flow: ramas topic desde `dev`, PR hacia `dev`; solo `dev` → `main`.
-- Cero secretos en el repo: Secrets Manager + OIDC federado.
-- Documentación en español; código/comentarios en inglés.
-- Entrega final: lista de archivos cambiados + comandos ejecutados y su salida real (sin inventar resultados).
+OBJECTIVE
 
-CRITERIO DE ACEPTACIÓN
-- `POST /query` devuelve respuesta con las fuentes recuperadas; `/health` responde 200.
-- Trazas de la cadena visibles en MLflow y evaluación offline ejecutable.
-- Tests en verde y `docker build` OK.
-- Terraform AWS pasa `terraform validate`; workflows referencian ECR + ECS Fargate con OIDC.
+Implement the full RAG chain and make the repository deployable on AWS, with CI/CD.
+
+STACK DECISIONS (use these)
+
+- Compute: ECS Fargate, two services (`rag-api` FastAPI, `rag-ui` Streamlit) behind one ALB.
+- Images: Amazon ECR. Applications secrets: AWS Secrets Manager. Corpus: Amazon S3.
+- Vector store: Pinecone (external) or OpenSearch Service, selected by `VECTOR_BACKEND`.
+- Observability: CloudWatch Logs and metrics; chain traces in MLflow.
+- LLM: configurable provider, credential read from Secrets Manager.
+- CI/CD: GitHub Actions authenticating with AWS through OIDC — no stored access keys.
+
+TASKS (in order)
+
+1. Cut `feat/rag-pipeline` from `dev`.
+2. Implement `retrievers.py` for real: `upsert` and `query` against Pinecone and OpenSearch,
+   with embeddings from the configured provider. Keep `get_retriever(VECTOR_BACKEND)` as the seam.
+3. Add `src/rag/chain.py`: retriever → prompt → LLM → answer with cited sources.
+   The model must answer only from the retrieved context and say so when the context is
+   insufficient (see `docs/architecture.md`).
+4. Wire `api.py` to the chain: `/query` returns the answer plus the source chunks;
+   keep `/health` intact, and map a vector-store outage to `503`.
+5. Instrument `monitoring.py` with MLflow (top-k, scores, latency, tokens) and add
+   an offline evaluation script reporting precision@k / recall@k over a labelled question set.
+6. Extend the Streamlit UI to show the answer with its sources.
+7. Add dependencies with `uv add` (for example `openai`, `sentence-transformers`, `boto3`)
+   and re-lock. Keep dev-only tooling in `[dependency-groups].dev`.
+8. Replace `infra/` with Terraform (`aws`): `main.tf`, `variables.tf`, `outputs.tf`,
+   `terraform.tfvars.example` covering ECR, the ECS Fargate cluster, task definitions and
+   services for API and UI, the ALB with target groups, Secrets Manager, the S3 corpus
+   bucket and least-privilege IAM roles. Run `terraform validate`.
+9. Extend `.github/workflows/ci.yml` with a deploy job (build → push to ECR →
+   `aws ecs update-service`) running only on pushes to `dev`, using OIDC. Pin every
+   action to a full commit SHA, as the existing CI does.
+10. Update `README.md`, `PLAN.md` and `docs/architecture.md` to match reality; keep them in English.
+11. Verify locally: `uv sync --locked`, `uv run ruff check . && uv run ruff format --check .`,
+    `uv run pytest -q`, `docker build -f docker/Dockerfile -t document-rag-assistant:ci .`,
+    and a smoke test hitting `/health`.
+
+RULES
+
+- Everything in the repository is written in **English** (code, comments, docs, commits).
+- Conventional Commits, imperative mood. One concern per branch and PR.
+- No secrets in the repository and no cloud keys in CI: Secrets Manager, task roles, OIDC.
+- Never push directly to `main`; open a PR into `dev`.
+- Report what you changed, the exact commands you ran and their real output. Do not
+  describe results you did not produce.
+
+ACCEPTANCE CRITERIA
+
+- `POST /query` returns an answer with the retrieved sources; `/health` returns 200.
+- Chain traces are visible in MLflow and the offline evaluation is runnable.
+- `uv run pytest -q` and `uv run ruff check .` pass; the Docker image builds.
+- `terraform validate` passes and CI publishes to ECR and updates the ECS services on `dev`
+  through OIDC.

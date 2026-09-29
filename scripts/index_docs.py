@@ -1,10 +1,11 @@
-"""Indexado inicial del corpus documental en la base vectorial.
+"""Initial indexing of the document corpus into the vector store.
 
-Uso:
+Usage:
     uv run python scripts/index_docs.py ./docs
 
-Placeholder: recorre documentos, aplica chunking y hace upsert en el backend
-configurado por VECTOR_BACKEND.
+Placeholder: walks the documents, applies the sliding-window chunking and
+upserts the embeddings into the backend selected by VECTOR_BACKEND.
+Reindexing writes a new index version; it never overwrites a serving index.
 """
 
 from __future__ import annotations
@@ -16,13 +17,14 @@ from rag.ingest import chunk_text, load_document
 
 
 def main(root: str) -> None:
-    files = [p for p in Path(root).rglob("*") if p.is_file()]
+    """Chunk every file under `root` and report the chunk counts."""
+    files = [path for path in Path(root).rglob("*") if path.is_file()]
     total = 0
     for path in files:
         text = load_document(str(path))
         chunks = chunk_text(text, doc_id=path.name)
         total += len(chunks)
-        # TODO: embeddings + upsert en Pinecone/OpenSearch
+        # TODO: embeddings -> upsert into Pinecone/OpenSearch
         print(f"{path.name}: {len(chunks)} chunks")
     print(f"total chunks: {total}")
 

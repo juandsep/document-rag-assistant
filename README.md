@@ -1,85 +1,86 @@
-# Document RAG Assistant · Sistema Documental (Retrieval-Augmented Generation)
+# Document RAG Assistant
 
-> Asistente que responde **preguntas de negocio** sobre un corpus documental: recupera los pasajes relevantes con una **base de datos vectorial**, genera la respuesta **citando las fuentes** y **monitoriza toda la cadena de recuperación en MLflow**.
+> Answers **business questions** over a document corpus: retrieves the relevant passages from a **vector database**, generates an answer **citing its sources**, and **traces the whole retrieval chain in MLflow**.
 
 ---
 
-## El problema
+## The problem
 
-El conocimiento de negocio vive disperso en PDFs, wikis, contratos y tickets. Buscar en ese corpus es lento y las respuestas de un LLM sin contexto **alucinan**: no hay forma de saber de dónde salió lo que afirma, ni de medir si la recuperación está mejorando o degradando.
+Business knowledge is scattered across PDFs, wikis, contracts and tickets. Searching that corpus is slow, and an LLM answering without context **hallucinates**: there is no way to tell where a claim came from, nor to measure whether retrieval is improving or degrading.
 
-## La solución
+## The approach
 
-Un pipeline **RAG** que separa las dos mitades del problema y las hace medibles por separado:
+A **RAG** pipeline that splits the problem in two and makes each half measurable:
 
-1. **Recuperación** — los documentos se trocean (`chunking`), se embeben y se indexan en una **base vectorial** (Pinecone u OpenSearch). Cada consulta recupera los *top-k* pasajes más similares.
-2. **Generación** — el LLM responde **solo con el contexto recuperado** y devuelve las **fuentes** de cada afirmación.
-3. **Monitorización** — cada consulta deja traza en **MLflow**: top-k recuperado, scores de similitud, latencia y uso de tokens. Sobre eso se ejecuta una **evaluación offline** (precision@k / recall@k) para saber si un cambio de retriever, de *chunking* o de embedding mejora o empeora.
+1. **Retrieval** — documents are chunked, embedded and indexed in a **vector database** (Pinecone or OpenSearch). Each query pulls the top-k most similar passages.
+2. **Generation** — the LLM answers **only from the retrieved context** and returns the **sources** behind every claim.
+3. **Monitoring** — every query leaves a trace in **MLflow**: retrieved top-k, similarity scores, latency and token usage. An **offline evaluation** (precision@k / recall@k) runs on top of that, so a change to the retriever, the chunking or the embedding model is measured instead of guessed.
 
-Con el retriever instrumentado, un cambio en el corpus o en el modelo deja de ser una apuesta: se mide.
-
-## Arquitectura
+## Architecture
 
 ```
-documentos ──▶ ingesta + chunking ──▶ embeddings ──▶ Vector DB (Pinecone / OpenSearch)
-                                                          │
-consulta ──▶ POST /query ──▶ retriever (top-k) ──▶ LLM ──▶ respuesta + fuentes citadas
-                  │                │
-                  └──── trazas ────┴──▶ MLflow (top-k, scores, latencia, tokens)
-                                          │
-                                          └──▶ evaluación offline (precision@k / recall@k)
-                                                          │
-                                    UI Streamlit ◀────────┘
+documents ──▶ ingest + chunking ──▶ embeddings ──▶ Vector DB (Pinecone / OpenSearch)
+                                                        │
+query ──▶ POST /query ──▶ retriever (top-k) ──▶ LLM ──▶ answer + cited sources
+              │                │
+              └──── traces ────┴──▶ MLflow (top-k, scores, latency, tokens)
+                                       │
+                                       └──▶ offline evaluation (precision@k / recall@k)
+                                                        │
+                                 Streamlit UI ◀─────────┘
 ```
 
 ## Stack
 
-| Capa | Tecnología |
+| Layer | Technology |
 |---|---|
 | API | FastAPI + Uvicorn |
-| Vector DB | Pinecone **o** OpenSearch (seleccionable por `VECTOR_BACKEND`) |
-| Ingesta | chunking propio + embeddings (`sentence-transformers` / proveedor) |
-| Generación | LLM configurable (proveedor vía secreto) |
-| Monitorización | MLflow (trazas de la cadena + evaluación del retriever) |
-| UI | Streamlit (alternativa: Gradio) |
-| Despliegue | AWS ECS Fargate + ALB, imágenes en ECR, corpus en S3 |
-| Secretos | AWS Secrets Manager (auth OIDC federada en CI) |
-| Observabilidad | CloudWatch Logs + métricas |
-| Gestión de entorno | **uv** (`pyproject.toml` + `uv.lock`) |
-| Tests | pytest |
+| Vector DB | Pinecone **or** OpenSearch (selected by `VECTOR_BACKEND`) |
+| Ingestion | chunking plus embeddings (`sentence-transformers` / provider) |
+| Generation | configurable LLM provider (credential via secret) |
+| Monitoring | MLflow (chain traces + retriever evaluation) |
+| UI | Streamlit (Gradio as an alternative) |
+| Deployment | AWS ECS Fargate + ALB, images in ECR, corpus in S3 |
+| Secrets | AWS Secrets Manager (OIDC federated auth in CI) |
+| Observability | CloudWatch Logs and metrics |
+| Environment | **uv** (`pyproject.toml` + `uv.lock`) |
+| Tests & lint | pytest · ruff |
 
-## Estado del proyecto
+## Project status
 
-Roadmap detallado en [`PLAN.md`](./PLAN.md).
+Roadmap in [`PLAN.md`](./PLAN.md).
 
-- [x] **F0** · Fundaciones: repo, proyecto `uv`, lock, tests, CI base
-- [x] Chunking funcional (`ingest.chunk_text`) + adaptadores Pinecone/OpenSearch (esqueleto)
-- [ ] **F1** · Ingesta: carga multi-formato, metadatos, deduplicación
-- [ ] **F2** · Vector store: upsert y query reales (Pinecone + OpenSearch)
-- [ ] **F3** · Cadena RAG: retriever → prompt → LLM → respuesta con fuentes
-- [ ] **F4** · API: `POST /query`, `GET /health`, validación Pydantic
-- [ ] **F5** · Monitorización MLflow + evaluación offline del retriever
-- [ ] **F6** · UI Streamlit (chat + fuentes)
-- [ ] **F7** · CI/CD y despliegue en AWS (ECR + ECS Fargate + ALB)
+- [x] **F0** · Foundations: repo, uv project, lockfile, tests, base CI
+- [x] Working chunking (`ingest.chunk_text`) and Pinecone/OpenSearch adapters (skeleton)
+- [ ] **F1** · Ingestion: multi-format loading, metadata, deduplication
+- [ ] **F2** · Vector store: real upsert and query (Pinecone + OpenSearch)
+- [ ] **F3** · RAG chain: retriever → prompt → LLM → answer with sources
+- [ ] **F4** · API: `POST /query`, `GET /health`, Pydantic validation
+- [ ] **F5** · MLflow monitoring and offline retriever evaluation
+- [ ] **F6** · Streamlit UI (chat plus sources)
+- [ ] **F7** · CI/CD and AWS deployment (ECR + ECS Fargate + ALB)
 
-## Estructura
+## Repository layout
 
 ```
 document-rag-assistant/
 ├─ src/rag/
-│   ├─ __init__.py     # entrypoint (`rag` console script)
-│   ├─ api.py          # FastAPI: /query, /health
-│   ├─ ingest.py       # carga, limpieza y chunking
-│   ├─ retrievers.py   # adaptadores Pinecone / OpenSearch
-│   ├─ monitoring.py   # trazas MLflow de la cadena de recuperación
-│   └─ ui.py           # interfaz Streamlit
-├─ tests/              # pytest
-├─ scripts/            # index_docs.py (indexado/reindexado)
-├─ infra/              # Terraform (aws): ECR, ECS Fargate, ALB, Secrets Manager, S3
-├─ .github/workflows/  # CI + deploy
-├─ Dockerfile
+│   ├─ __init__.py     # package entry point
+│   ├─ api.py          # FastAPI app: /query, /health
+│   ├─ ingest.py       # loading, cleaning and chunking
+│   ├─ retrievers.py   # Pinecone / OpenSearch adapters
+│   ├─ monitoring.py   # MLflow traces of the retrieval chain
+│   └─ ui.py           # Streamlit interface
+├─ tests/
+│   ├─ unit/           # fast, no external services
+│   └─ integration/    # wired against fakes or containers
+├─ scripts/            # index_docs.py (indexing / reindexing)
+├─ docker/             # multi-stage Dockerfile
+├─ docs/               # architecture notes
+├─ infra/              # Terraform (aws)
+├─ .github/workflows/  # CI and deploy
 ├─ PLAN.md
-└─ pyproject.toml      # dependencias gestionadas con uv
+└─ pyproject.toml      # dependencies managed with uv
 ```
 
 ## Quickstart
@@ -88,50 +89,50 @@ document-rag-assistant/
 git clone https://github.com/juandsep/document-rag-assistant.git
 cd document-rag-assistant
 
-uv sync                # crea .venv desde uv.lock
-uv run pytest -q       # tests
-uv run rag             # levanta la API en http://localhost:8000
+uv sync                  # create .venv from uv.lock
+uv run pytest -q         # unit tests
+uv run uvicorn rag.api:app --reload   # http://localhost:8000
 ```
 
-Consultar:
+Ask a question:
 
 ```bash
 curl -X POST "http://localhost:8000/query" -H "Content-Type: application/json" \
-     -d '{"q": "¿Cuál es la política de devoluciones?"}'
+     -d '{"q": "What is the return policy?"}'
 ```
 
-Indexar un corpus e interactuar con la UI:
+Index a corpus and open the UI:
 
 ```bash
 uv run python scripts/index_docs.py ./docs
 uv run streamlit run src/rag/ui.py
 ```
 
-## Configuración
+## Configuration
 
-| Variable | Descripción |
+| Variable | Description |
 |---|---|
 | `VECTOR_BACKEND` | `pinecone` \| `opensearch` |
-| `PINECONE_API_KEY` / `PINECONE_INDEX` | credenciales Pinecone |
-| `OPENSEARCH_HOST` / `OPENSEARCH_INDEX` | endpoint OpenSearch |
-| `MLFLOW_TRACKING_URI` | backend de tracking |
-| `LLM_PROVIDER` / `OPENAI_API_KEY` | proveedor LLM y credencial |
-| `RAG_API_URL` | URL de la API consumida por la UI |
+| `PINECONE_API_KEY` / `PINECONE_INDEX` | Pinecone credentials |
+| `OPENSEARCH_HOST` / `OPENSEARCH_INDEX` | OpenSearch endpoint |
+| `MLFLOW_TRACKING_URI` | tracking backend |
+| `LLM_PROVIDER` / `OPENAI_API_KEY` | LLM provider and credential |
+| `RAG_API_URL` | API base URL consumed by the UI |
 
-## Despliegue
+## Deployment
 
-`docker build -t document-rag-assistant .` → push a **ECR** → `aws ecs update-service` (servicios `rag-api` y `rag-ui` tras un ALB).
-Terraform e instrucciones en [`infra/`](./infra/README.md); pipeline en `.github/workflows/`.
+`docker build -f docker/Dockerfile -t document-rag-assistant .` → push to **ECR** → `aws ecs update-service` (`rag-api` and `rag-ui` services behind one ALB).
+Terraform and notes in [`infra/`](./infra/README.md); pipeline in `.github/workflows/`.
 
-## Métricas de éxito
+## Success metrics
 
-- precision@k / recall@k del retriever por encima del umbral acordado.
-- Latencia extremo a extremo p95 < 3 s.
-- Trazabilidad completa: cada respuesta enlaza a los documentos fuente recuperados.
+- Retriever precision@k / recall@k above the agreed threshold.
+- End-to-end p95 latency below 3 s.
+- Full traceability: every answer links back to the retrieved source documents.
 
-## Referencias
+## Related
 
-Estructura, CI y convenciones alineadas con el pipeline de referencia `uplift-modeling-pipeline`.
+Structure, CI and conventions follow the reference pipeline `uplift-modeling-pipeline`.
 
 ---
 

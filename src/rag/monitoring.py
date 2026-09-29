@@ -9,8 +9,8 @@ from __future__ import annotations
 
 import os
 import time
+from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import Iterator
 
 _DEFAULT_URI = os.getenv("MLFLOW_TRACKING_URI", "")
 
@@ -44,7 +44,11 @@ def trace_query(name: str = "rag_query") -> Iterator[dict]:
         if mlflow is not None:
             with mlflow.start_run(run_name=name, nested=True):
                 mlflow.log_metrics(
-                    {k: float(v) for k, v in payload.items() if isinstance(v, (int, float))}
+                    {
+                        k: float(v)
+                        for k, v in payload.items()
+                        if isinstance(v, (int, float))
+                    }
                 )
 
 

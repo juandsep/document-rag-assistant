@@ -1,12 +1,16 @@
-"""Main entrypoint for the RAG package.
+"""Document RAG assistant."""
 
-The package uses `rag` as a console script to run the FastAPI service.
-"""
+from __future__ import annotations
 
-from .api import app
+import os
+
 
 def main() -> None:
-    """Run the FastAPI service via uvicorn."""
+    """Run the RAG API. Console script entry point: `rag`."""
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
 
+    uvicorn.run("rag.api:app", host="0.0.0.0", port=int(os.getenv("PORT", "8000")))
+
+
+if __name__ == "__main__":
+    main()

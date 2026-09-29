@@ -15,7 +15,9 @@ class Chunk:
     text: str
 
 
-def chunk_text(text: str, doc_id: str = "doc", size: int = 800, overlap: int = 100) -> list[Chunk]:
+def chunk_text(
+    text: str, doc_id: str = "doc", size: int = 800, overlap: int = 100
+) -> list[Chunk]:
     """Divide `text` en fragmentos con solape.
 
     Args:

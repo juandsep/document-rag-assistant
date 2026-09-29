@@ -1,24 +1,26 @@
-# PLAN — Sistema Documental RAG
+# Plan — Document RAG Assistant
 
-Objetivo: asistente de consultas de negocio sobre corpus documental, con recuperación vectorial, monitorización de la cadena y UI.
+Goal: a business question-answering assistant over a document corpus, with vector retrieval, a traced retrieval chain and a UI.
 
-## Fases
+Each phase is one short-lived branch cut from `dev`, one pull request, one concern.
 
-- [x] **F0 · Fundaciones** — repo git, proyecto `uv`, lock, `pytest`, CI base.
-- [ ] **F1 · Ingesta** — `ingest.py`: carga de documentos, chunking, metadatos, deduplicación.
-- [ ] **F2 · Vector store** — `retrievers.py`: adaptadores Pinecone y OpenSearch (create/upsert/query), seleccionados por `VECTOR_BACKEND`.
-- [ ] **F3 · Cadena RAG** — retriever + prompt + LLM; respuesta con citas/fuentes.
-- [ ] **F4 · API** — `api.py`: `POST /query`, `/health`; validación con Pydantic.
-- [ ] **F5 · Monitorización** — `monitoring.py`: trazas MLflow (top‑k, latencia, relevancia, uso de tokens), evaluación offline del retriever.
-- [ ] **F6 · UI** — `ui.py`: Streamlit (chat + fuentes); alternativa Gradio.
-- [ ] **F7 · CI/CD y despliegue** — GitHub Actions (lint/test/build) → contenedor → ECS/Cloud Run.
+## Phases
 
-## Métricas de éxito
+- [x] **F0 · Foundations** — git repo, uv project, lockfile, pytest, base CI.
+- [ ] **F1 · Ingestion** — `ingest.py`: document loading, chunking, metadata, deduplication.
+- [ ] **F2 · Vector store** — `retrievers.py`: real Pinecone and OpenSearch adapters (create/upsert/query), selected by `VECTOR_BACKEND`.
+- [ ] **F3 · RAG chain** — retriever + prompt + LLM; answers carry citations back to the source chunks.
+- [ ] **F4 · API** — `api.py`: `POST /query`, `GET /health`, Pydantic request/response models.
+- [ ] **F5 · Monitoring** — `monitoring.py`: MLflow traces (top-k, latency, relevance, token usage) plus offline retriever evaluation.
+- [ ] **F6 · UI** — `ui.py`: Streamlit chat with a sources panel; Gradio as an alternative.
+- [ ] **F7 · CI/CD and deployment** — GitHub Actions (lint, test, build) → image → ECS Fargate behind an ALB.
 
-- Precision@k / recall@k del retriever por encima del umbral acordado.
-- Latencia extremo a extremo p95 < 3 s.
-- Trazabilidad completa: cada respuesta enlaza a los documentos fuente recuperados.
+## Success metrics
 
-## Referencia
+- Retriever precision@k / recall@k above the agreed threshold.
+- End-to-end p95 latency below 3 s.
+- Full traceability: every answer links back to the retrieved source documents.
 
-Estructura, CI y convenciones basadas en `../portfolio/uplift-modeling-pipeline`.
+## Reference
+
+Structure, CI and conventions follow `uplift-modeling-pipeline`.
