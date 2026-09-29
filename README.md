@@ -2,6 +2,10 @@
 
 > Answers **business questions** over a document corpus: retrieves the relevant passages from a **vector database**, generates an answer **citing its sources**, and **traces the whole retrieval chain in MLflow**.
 
+[![CI](https://github.com/juandsep/document-rag-assistant/actions/workflows/ci.yml/badge.svg)](https://github.com/juandsep/document-rag-assistant/actions/workflows/ci.yml)
+![Python](https://img.shields.io/badge/python-3.11-blue)
+![License](https://img.shields.io/badge/license-MIT-green)
+
 ---
 
 ## The problem
