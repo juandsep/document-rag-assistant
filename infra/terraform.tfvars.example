@@ -1,0 +1,25 @@
+# Copy to terraform.tfvars and fill in. The file is git-ignored.
+region      = "us-east-1"
+environment = "staging"
+alert_email = "you@example.com"
+
+# Only uncomment what differs from the defaults in main.tf: project, region,
+# image_tag, vector_backend, api_desired_count, ui_desired_count,
+# monthly_budget_usd, github_repo, github_branch, create_github_oidc_provider.
+
+# AWS allows one token.actions.githubusercontent.com provider per account. Set
+# this to false when the account already has one, or apply fails with
+# EntityAlreadyExists.
+# create_github_oidc_provider = false
+
+# Placeholders: replace the value after apply, so real credentials never reach
+# a .tfvars file.
+#   aws secretsmanager put-secret-value --secret-id <app_secret_arn> \
+#     --secret-string file://secret.json
+# rag_secret_json = <<-JSON
+#   {
+#     "PINECONE_API_KEY": "...",
+#     "OPENAI_API_KEY": "...",
+#     "MLFLOW_TRACKING_URI": "..."
+#   }
+# JSON
