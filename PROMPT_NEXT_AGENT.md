@@ -6,7 +6,7 @@ Copy everything below the line into the next agent's first message.
 
 CONTEXT
 
-- Repository: `juandsep/document-rag-assistant` (the local folder is named `rag`).
+- Repository: `juandsep/document-rag-assistant` (the local folder carries the same name).
   Work only inside that folder.
 - Python project managed with **uv** (`pyproject.toml` + `uv.lock`). Console script: `uv run rag`.
 - Branch model: `main` (releases) ← `dev` (integration) ← topic branches cut from `dev`.
