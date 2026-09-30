@@ -6,8 +6,8 @@ Copy everything below the line into the next agent's first message.
 
 CONTEXT
 
-- Repository: juandsep/document-rag-assistant (local folder name is `rag`; the GitHub repo is
-  `juandsep/document-rag-assistant`). Work only inside that folder.
+- Repository: `juandsep/document-rag-assistant` (the local folder is named `rag`).
+  Work only inside that folder.
 - Python project managed with **uv** (`pyproject.toml` + `uv.lock`). Console script: `uv run rag`.
 - Branch model: `main` (releases) ← `dev` (integration) ← topic branches cut from `dev`.
   Cut your branch from `dev`; `main` only receives PRs from `dev`.
@@ -21,8 +21,9 @@ CONTEXT
   - `.github/workflows/ci.yml` — test job (uv sync --locked, ruff, pytest) and a docker build job.
   - Not implemented yet: real vector upsert/query, the retrieval chain, the LLM call,
     offline evaluation and any AWS infrastructure.
-- Reference for structure and conventions: the uplift-modeling-pipeline project.
-  Mirror its layout, its CI shape, its CONTRIBUTING conventions and its Dockerfile pattern.
+- Reference for structure and conventions: the `uplift-modeling-pipeline` project of the
+  same portfolio. Mirror its layout, its CI shape, its CONTRIBUTING conventions and its
+  Dockerfile pattern.
 
 OBJECTIVE
 
