@@ -44,6 +44,8 @@ CONTEXT
 - `README.md`, `PLAN.md` and `docs/architecture.md` describe the **target** end state (S3
   corpus, Secrets Manager, ECS/ALB, offline evaluation), not what the code does today.
   Reconcile them with reality; never read them as a description of the current implementation.
+  The README's configuration table still lists `LLM_PROVIDER` and `OPENAI_API_KEY`; the LLM is
+  an Ollama endpoint, and `infra/` now defines both `OLLAMA_*` variables and the secret keys.
 - Reference for structure and conventions: the `uplift-modeling-pipeline` project of the same
   portfolio. Mirror its layout, its CONTRIBUTING conventions and its Dockerfile pattern. Note
   that it ships a **separate** `.github/workflows/deploy.yml` next to `ci.yml` — its deploy job
@@ -59,7 +61,9 @@ STACK DECISIONS (use these)
 - Images: Amazon ECR. Applications secrets: AWS Secrets Manager. Corpus: Amazon S3.
 - Vector store: Pinecone (external) or OpenSearch Service, selected by `VECTOR_BACKEND`.
 - Observability: CloudWatch Logs and metrics; chain traces in MLflow.
-- LLM: configurable provider, credential read from Secrets Manager.
+- LLM: Ollama's HTTP API (`OLLAMA_BASE_URL`, `OLLAMA_MODEL`), the same server
+  used for embeddings (`EMBEDDING_MODEL`); bearer token from Secrets Manager when
+  the endpoint asks for one. No OpenAI client.
 - CI/CD: GitHub Actions authenticating with AWS through OIDC — no stored access keys, in a
   `deploy.yml` of its own as the reference project does.
 
@@ -75,9 +79,13 @@ TASKS (in order)
    overwrites the serving index.
 3. Finish `scripts/index_docs.py`: it must upsert through the retriever instead of printing
    chunk counts.
-4. Add `src/rag/chain.py`: retriever → prompt → LLM → answer with cited sources.
-   The model must answer only from the retrieved context and say so when the context is
-   insufficient (see `docs/architecture.md`).
+4. Add `src/rag/chain.py` — Ollama only, no provider zoo: embed the question
+   through the Ollama embeddings endpoint, retrieve, build the prompt from the
+   passages alone, generate with `OLLAMA_MODEL`, answer with cited sources. The
+   model must say the context is insufficient instead of improvising (see
+   `docs/architecture.md`). Config comes from `OLLAMA_BASE_URL`, `OLLAMA_MODEL`,
+   `EMBEDDING_MODEL` and an optional `OLLAMA_API_KEY`; all read lazily, none
+   required at import.
 5. Wire `api.py` to the chain: reuse the existing `QueryRequest`/`QueryResponse`/`Source`
    models — `/query` returns the answer plus the source chunks; keep `/health` returning 200,
    and map a vector-store outage to `503`.
@@ -85,8 +93,10 @@ TASKS (in order)
    (top-k, scores, latency, tokens) and add an offline evaluation script reporting
    precision@k / recall@k over a labelled question set.
 7. Extend the Streamlit UI to show the answer with its sources.
-8. Add dependencies with `uv add` (for example `openai`, `sentence-transformers`, `boto3`)
-   and re-lock. Keep dev-only tooling in `[dependency-groups].dev`.
+8. Add dependencies with `uv add` and re-lock: `httpx` for the Ollama calls, `boto3` when the
+   corpus moves to S3. Do not add `openai` or `sentence-transformers` — embeddings come from
+   the same Ollama endpoint, so the image stays free of torch. Keep dev-only tooling in
+   `[dependency-groups].dev`.
 9. Replace the README-only `infra/` with Terraform (`aws`): `main.tf`, `variables.tf`,
    `outputs.tf`, `terraform.tfvars.example` covering ECR, the ECS Fargate cluster, task
    definitions and services for API and UI, the ALB with target groups, Secrets Manager, the S3
