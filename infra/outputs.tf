@@ -1,6 +1,11 @@
-output "alb_dns_name" {
-  description = "Public entry point: API paths plus the Streamlit UI."
-  value       = aws_lb.main.dns_name
+output "function_url" {
+  description = "Public entry point. With function_url_auth_type = AWS_IAM callers must sign the request."
+  value       = aws_lambda_function_url.api.function_url
+}
+
+output "function_name" {
+  description = "Function CI updates on deploy."
+  value       = aws_lambda_function.api.function_name
 }
 
 output "ecr_repository_url" {
@@ -8,20 +13,6 @@ output "ecr_repository_url" {
   value       = aws_ecr_repository.app.repository_url
 }
 
-output "ecs_cluster_name" {
-  description = "Cluster both services run in."
-  value       = aws_ecs_cluster.main.name
-}
-
-output "api_service_name" {
-  description = "Service CI rolls out on deploy."
-  value       = aws_ecs_service.api.name
-}
-
-output "ui_service_name" {
-  description = "Service CI rolls out on deploy."
-  value       = aws_ecs_service.ui.name
-}
 
 output "corpus_bucket" {
   description = "S3 bucket holding the document corpus."

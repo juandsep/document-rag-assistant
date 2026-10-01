@@ -13,7 +13,7 @@ Each phase is one short-lived branch cut from `dev`, one pull request, one conce
 - [ ] **F4 · API** — `api.py`: `POST /query`, `GET /health`, Pydantic request/response models.
 - [ ] **F5 · Monitoring** — `monitoring.py`: MLflow traces (top-k, latency, relevance, token usage) plus offline retriever evaluation.
 - [ ] **F6 · UI** — `ui.py`: Streamlit chat with a sources panel; Gradio as an alternative.
-- [ ] **F7 · CI/CD and deployment** — GitHub Actions (lint, test, build) → image → ECS Fargate behind an ALB.
+- [ ] **F7 · CI/CD and deployment** — GitHub Actions (lint, test, build) → image → ECR → Lambda behind a Function URL.
 
 ## Success metrics
 

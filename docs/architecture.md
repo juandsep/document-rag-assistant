@@ -51,6 +51,20 @@ what turns "the answers feel better" into a number attached to a pull request.
 
 ## Deployment
 
-ECS Fargate runs two services behind one ALB: `rag-api` (FastAPI) and `rag-ui`
-(Streamlit). The corpus lives in S3; credentials come from Secrets Manager
-through the task role. The image is built from `docker/Dockerfile` and pushed to ECR.
+Lambda runs the API as a container image, reached through a Function URL:
+HTTPS and a public hostname with no load balancer, and no bill while nobody
+asks anything. The image is built from `docker/Dockerfile` and pushed to ECR;
+the Lambda Web Adapter inside it serves the same FastAPI app that runs locally.
+
+The corpus lives in S3 and the credentials in Secrets Manager, read by the
+function role — not injected as environment variables. `reserved_concurrency`
+caps how much a reachable URL can spend.
+
+Streamlit is not deployed: it needs a long-lived websocket server, which a
+Function URL does not provide. It runs locally against the deployed API.
+
+The chat model is Ollama's HTTP API, reachable from the function over the
+internet; embeddings come from the same endpoint, so the image carries no
+model weights. If a corpus outgrows an embedded index, `VECTOR_BACKEND`
+switches the retriever to Qdrant, Pinecone or OpenSearch without touching the
+chain.

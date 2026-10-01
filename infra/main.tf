@@ -1,5 +1,5 @@
-# Base AWS resources: provider, image registry, log groups, the GitHub Actions
-# OIDC trust and the monthly budget guard.
+# Base AWS resources: provider, image registry, the function log group, the
+# GitHub Actions OIDC trust, the deploy role and the budget guard.
 #
 # State is local (terraform.tfstate, git-ignored), matching the reference project
 # `uplift-modeling-pipeline`. Move it to an S3 backend before a second person
@@ -46,30 +46,30 @@ variable "environment" {
 }
 
 variable "image_tag" {
-  description = "Tag of the image both services run. CI rewrites it on every deploy; `bootstrap` before the first one."
+  description = "Tag of the image the function runs. CI rewrites it on every deploy; `bootstrap` before the first one."
   type        = string
   default     = "bootstrap"
 }
 
 variable "vector_backend" {
-  description = "Retriever the API talks to: pinecone or opensearch."
+  description = "Retriever the chain talks to: local, qdrant, pinecone or opensearch."
   type        = string
-  default     = "pinecone"
+  default     = "local"
 
   validation {
-    condition     = contains(["pinecone", "opensearch"], var.vector_backend)
-    error_message = "vector_backend must be pinecone or opensearch."
+    condition     = contains(["local", "qdrant", "pinecone", "opensearch"], var.vector_backend)
+    error_message = "vector_backend must be local, qdrant, pinecone or opensearch."
   }
 }
 
 variable "ollama_base_url" {
-  description = "Ollama HTTP API the chain calls. Must be reachable from the tasks: a localhost default only works for a local run."
+  description = "Ollama HTTP API the chain calls. Must be reachable from Lambda: the localhost default only works for a local run."
   type        = string
   default     = "http://localhost:11434"
 }
 
 variable "ollama_model" {
-  description = "Model the chain generates with, and embeds with unless embedding_model overrides it."
+  description = "Model the chain generates with."
   type        = string
   default     = "llama3.1:8b"
 }
@@ -80,22 +80,49 @@ variable "embedding_model" {
   default     = "nomic-embed-text"
 }
 
-variable "api_desired_count" {
-  description = "Number of API tasks. Two keeps the service up while one task deploys, at twice the Fargate cost."
+variable "lambda_memory_mb" {
+  description = "Function memory. CPU scales with it, so this is the knob for latency: 1024 MB keeps a retrieval round trip to a couple of seconds."
   type        = number
-  default     = 1
+  default     = 1024
+
+  validation {
+    condition     = var.lambda_memory_mb >= 128 && var.lambda_memory_mb <= 10240
+    error_message = "lambda_memory_mb must be between 128 and 10240."
+  }
 }
 
-variable "ui_desired_count" {
-  description = "Number of Streamlit tasks."
+variable "lambda_timeout_s" {
+  description = "Function timeout. The chain waits on Ollama, so it is generous compared with a CPU-bound handler."
   type        = number
-  default     = 1
+  default     = 60
+
+  validation {
+    condition     = var.lambda_timeout_s >= 3 && var.lambda_timeout_s <= 900
+    error_message = "lambda_timeout_s must be between 3 and 900."
+  }
+}
+
+variable "reserved_concurrency" {
+  description = "Hard ceiling on concurrent invocations, and the only guard that actually caps what a reachable URL can spend. -1 leaves the account-wide pool unbounded."
+  type        = number
+  default     = 2
+}
+
+variable "function_url_auth_type" {
+  description = "AWS_IAM keeps the endpoint private (callers sign with SigV4); NONE makes it public, so anyone with the URL can spend model time on the Ollama host."
+  type        = string
+  default     = "AWS_IAM"
+
+  validation {
+    condition     = contains(["AWS_IAM", "NONE"], var.function_url_auth_type)
+    error_message = "function_url_auth_type must be AWS_IAM or NONE."
+  }
 }
 
 variable "monthly_budget_usd" {
-  description = "Budget alarm threshold. Billing data lags by hours, so spend can pass it slightly."
+  description = "Budget alarm threshold. The stack idles under a dollar, so this alarm is meant to fire when something is actually wrong."
   type        = number
-  default     = 5
+  default     = 2
 }
 
 variable "alert_email" {
@@ -113,6 +140,12 @@ variable "github_branch" {
   description = "Branch whose pushes may assume the deploy role."
   type        = string
   default     = "dev"
+}
+
+variable "github_oidc_thumbprint" {
+  description = "Thumbprint of the token.actions.githubusercontent.com certificate. Only used when this configuration creates the provider."
+  type        = string
+  default     = "6938fd4d98bab03faadb97b34396831e3780aea1"
 }
 
 variable "create_github_oidc_provider" {
@@ -137,20 +170,21 @@ variable "rag_secret_json" {
 locals {
   name_prefix = "${var.project}-${var.environment}"
   secret_arn  = aws_secretsmanager_secret.app.arn
-  container_env = [
-    { name = "PORT", value = "8000" },
-    { name = "VECTOR_BACKEND", value = var.vector_backend },
-    { name = "OLLAMA_BASE_URL", value = var.ollama_base_url },
-    { name = "OLLAMA_MODEL", value = var.ollama_model },
-    { name = "EMBEDDING_MODEL", value = var.embedding_model },
-  ]
-  # Keys the container reads out of Secrets Manager. Keep in sync with the JSON
-  # body above and with the variables documented in README.md.
-  secret_env = [
-    { name = "PINECONE_API_KEY", valueFrom = "${local.secret_arn}:PINECONE_API_KEY::" },
-    { name = "OLLAMA_API_KEY", valueFrom = "${local.secret_arn}:OLLAMA_API_KEY::" },
-    { name = "MLFLOW_TRACKING_URI", valueFrom = "${local.secret_arn}:MLFLOW_TRACKING_URI::" },
-  ]
+
+  # Plain configuration the function reads at import. Nothing here is a
+  # credential: keys are read from the secret named by APP_SECRET_ARN.
+  function_env = {
+    VECTOR_BACKEND  = var.vector_backend
+    OLLAMA_BASE_URL = var.ollama_base_url
+    OLLAMA_MODEL    = var.ollama_model
+    EMBEDDING_MODEL = var.embedding_model
+    APP_SECRET_ARN  = local.secret_arn
+
+    # The adapter in docker/Dockerfile forwards to the port the image listens on.
+    AWS_LWA_PORT                    = "8000"
+    AWS_LWA_READINESS_CHECK_PATH    = "/health"
+    AWS_LWA_READINESS_CHECK_TIMEOUT = "5"
+  }
 }
 
 resource "aws_ecr_repository" "app" {
@@ -159,11 +193,6 @@ resource "aws_ecr_repository" "app" {
 
   image_scanning_configuration {
     scan_on_push = true
-  }
-
-  # Deploys keep tags that a rollback may still point at.
-  lifecycle {
-    prevent_destroy = false
   }
 }
 
@@ -185,17 +214,11 @@ resource "aws_ecr_lifecycle_policy" "app" {
 }
 
 resource "aws_cloudwatch_log_group" "api" {
-  name              = "/ecs/${local.name_prefix}-api"
+  name              = "/aws/lambda/${local.name_prefix}-api"
   retention_in_days = 14
 }
 
-resource "aws_cloudwatch_log_group" "ui" {
-  name              = "/ecs/${local.name_prefix}-ui"
-  retention_in_days = 14
-}
-
-# Budget guard: the cheapest way to find out that a Fargate service was left
-# running. Billing data lags, so this warns rather than stops anything.
+# Budget guard: the cheapest way to find out that something is burning money.
 resource "aws_budgets_budget" "monthly" {
   name         = "${local.name_prefix}-monthly"
   budget_type  = "COST"
@@ -218,7 +241,7 @@ resource "aws_iam_openid_connect_provider" "github" {
 
   url             = "https://token.actions.githubusercontent.com"
   client_id_list  = ["sts.amazonaws.com"]
-  thumbprint_list = ["6938fd4d98bab03faadb97b34396831e3780aea1"]
+  thumbprint_list = [var.github_oidc_thumbprint]
 }
 
 data "aws_iam_openid_connect_provider" "existing" {
@@ -241,13 +264,13 @@ data "aws_iam_policy_document" "deploy_assume" {
       identifiers = [local.oidc_provider_arn]
     }
 
-    # Only a push to the deployment branch of the one repository may assume it.
     condition {
       test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:aud"
       values   = ["sts.amazonaws.com"]
     }
 
+    # Only a push to the deployment branch of the one repository may assume it.
     condition {
       test     = "StringLike"
       variable = "token.actions.githubusercontent.com:sub"
@@ -285,28 +308,28 @@ data "aws_iam_policy_document" "deploy_permissions" {
   }
 
   statement {
-    sid    = "Rollout"
+    sid    = "RollOut"
     effect = "Allow"
     actions = [
-      "ecs:DescribeServices",
-      "ecs:DescribeTaskDefinition",
-      "ecs:RegisterTaskDefinition",
-      "ecs:UpdateService",
+      "lambda:GetFunction",
+      "lambda:GetFunctionConfiguration",
+      "lambda:UpdateFunctionCode",
+      "lambda:UpdateFunctionConfiguration",
     ]
-    resources = ["*"]
+    resources = [aws_lambda_function.api.arn]
   }
 
-  # Registering a task definition runs it as the task and execution roles.
+  # Updating the function's configuration sets its execution role.
   statement {
-    sid       = "PassTaskRoles"
+    sid       = "PassFunctionRole"
     effect    = "Allow"
     actions   = ["iam:PassRole"]
-    resources = [aws_iam_role.task.arn, aws_iam_role.execution.arn]
+    resources = [aws_iam_role.function.arn]
 
     condition {
       test     = "StringEquals"
       variable = "iam:PassedToService"
-      values   = ["ecs-tasks.amazonaws.com"]
+      values   = ["lambda.amazonaws.com"]
     }
   }
 }

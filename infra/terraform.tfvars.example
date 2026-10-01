@@ -5,13 +5,18 @@ alert_email = "you@example.com"
 
 # Only uncomment what differs from the defaults in main.tf: project, region,
 # image_tag, vector_backend, ollama_base_url, ollama_model, embedding_model,
-# api_desired_count, ui_desired_count, monthly_budget_usd, github_repo,
-# github_branch, create_github_oidc_provider.
+# lambda_memory_mb, lambda_timeout_s, reserved_concurrency,
+# function_url_auth_type, monthly_budget_usd, github_repo, github_branch,
+# github_oidc_thumbprint, create_github_oidc_provider.
 
-# The default is localhost, which the tasks cannot reach: point this at an
+# The default is localhost, which Lambda cannot reach: point this at an
 # endpoint that is reachable from AWS and that asks for a token.
 # ollama_base_url = "https://ollama.example.com"
 # ollama_model    = "llama3.1:8b"
+
+# AWS_IAM (default) keeps the endpoint private. NONE makes it public: anyone
+# with the URL can then spend model time on the Ollama host.
+# function_url_auth_type = "AWS_IAM"
 
 # AWS allows one token.actions.githubusercontent.com provider per account. Set
 # this to false when the account already has one, or apply fails with
