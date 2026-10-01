@@ -31,9 +31,12 @@ CONTEXT
   - `tests/unit/` and `tests/integration/` (TestClient, no external services).
   - `scripts/index_docs.py` — walks the corpus, chunks it, prints per-file counts and stops at
     `TODO: embeddings -> upsert`.
-  - `docker/Dockerfile` (multi-stage, non-root, healthcheck), `docs/architecture.md`,
+  - `docker/Dockerfile` (multi-stage, non-root, healthcheck, plus the Lambda Web Adapter
+    extension that lets the same image run on Lambda), `docs/architecture.md`,
     `PLAN.md`, `CONTRIBUTING.md`.
-  - `infra/` holds **a README only** — no `.tf` file exists and there is no state.
+  - `infra/` holds the Terraform for the deployed shape: `main.tf`, `lambda.tf`, `storage.tf`,
+    `outputs.tf`, `terraform.tfvars.example` and `README.md`. `terraform init -backend=false &&
+    terraform validate` passes; nothing has been applied.
   - `.github/workflows/ci.yml` — a `test` job (`uv sync --locked`, both ruff commands,
     `pytest --cov`) and a `docker` build job; every action pinned to a full commit SHA with the
     tag in a comment.
@@ -57,15 +60,20 @@ Implement the full RAG chain and make the repository deployable on AWS, with CI/
 
 STACK DECISIONS (use these)
 
-- Compute: ECS Fargate, two services (`rag-api` FastAPI, `rag-ui` Streamlit) behind one ALB.
+- Compute: AWS Lambda running the container image, reached through a Lambda Function URL.
+  No ALB and no VPC: an ALB bills ~$16/month before a single request, the whole ECS stack
+  ~$53/month, and this shape idles under a dollar.
 - Images: Amazon ECR. Applications secrets: AWS Secrets Manager. Corpus: Amazon S3.
-- Vector store: Pinecone (external) or OpenSearch Service, selected by `VECTOR_BACKEND`.
+- Vector store: an embedded index (`local`, the infra default) for a portfolio-sized corpus,
+  with Qdrant, Pinecone or OpenSearch Service behind the same seam, selected by `VECTOR_BACKEND`.
 - Observability: CloudWatch Logs and metrics; chain traces in MLflow.
 - LLM: Ollama's HTTP API (`OLLAMA_BASE_URL`, `OLLAMA_MODEL`), the same server
   used for embeddings (`EMBEDDING_MODEL`); bearer token from Secrets Manager when
   the endpoint asks for one. No OpenAI client.
 - CI/CD: GitHub Actions authenticating with AWS through OIDC — no stored access keys, in a
   `deploy.yml` of its own as the reference project does.
+- UI: Streamlit is **not** deployed — a Function URL has no websockets. It runs locally against
+  the deployed API (`RAG_API_URL=<function url>`).
 
 TASKS (in order)
 
@@ -73,10 +81,11 @@ TASKS (in order)
    concern per branch and PR, and this list spans several. Do not do all of it on a single
    `feat/rag-pipeline` branch.
 2. Implement `retrievers.py` for real: extend the `Retriever` Protocol with `upsert`
-   (chunk → embedding → metadata) alongside `query`, against Pinecone and OpenSearch, with
-   embeddings from the configured provider. Keep `get_retriever(VECTOR_BACKEND)` as the seam
-   and `Retrieved` as the returned shape. Reindexing writes a **new** index version and never
-   overwrites the serving index.
+   (chunk → embedding → metadata) alongside `query`. Implement the embedded `local` backend
+   first — it is what `infra/` deploys by default and it needs no service — then Pinecone and
+   OpenSearch behind the same seam. Embeddings come from the Ollama endpoint. Keep
+   `get_retriever(VECTOR_BACKEND)` as the seam and `Retrieved` as the returned shape.
+   Reindexing writes a **new** index version and never overwrites the serving index.
 3. Finish `scripts/index_docs.py`: it must upsert through the retriever instead of printing
    chunk counts.
 4. Add `src/rag/chain.py` — Ollama only, no provider zoo: embed the question
@@ -97,16 +106,16 @@ TASKS (in order)
    corpus moves to S3. Do not add `openai` or `sentence-transformers` — embeddings come from
    the same Ollama endpoint, so the image stays free of torch. Keep dev-only tooling in
    `[dependency-groups].dev`.
-9. Replace the README-only `infra/` with Terraform (`aws`): `main.tf`, `variables.tf`,
-   `outputs.tf`, `terraform.tfvars.example` covering ECR, the ECS Fargate cluster, task
-   definitions and services for API and UI, the ALB with target groups, Secrets Manager, the S3
-   corpus bucket and least-privilege IAM roles. Pin the provider with `required_providers` and
-   state the state-backend decision. The container `PORT` and the ALB target-group health path
-   must match `/health`. Prove it with `terraform init -backend=false && terraform validate`
-   (Terraform 1.16 is installed locally); anything that needs a real account is proven in CI,
-   not claimed.
+9. `infra/` already carries the Terraform for this shape — read `infra/README.md` before
+   changing it. Extend rather than rewrite: ECR, the container-image function, its Function URL
+   (`function_url_auth_type` defaults to `AWS_IAM`), `reserved_concurrency` as the spend cap,
+   Secrets Manager, the S3 corpus bucket and least-privilege roles are done. The function's
+   `AWS_LWA_PORT` must stay matched to the port the image listens on, and the readiness path
+   to `/health`. Prove every change with `terraform init -backend=false && terraform validate`
+   (Terraform 1.16 is installed locally); anything needing a real account is proven in CI, not
+   claimed.
 10. Add `.github/workflows/deploy.yml` — its own file, mirroring the reference project: build →
-    push to ECR → `aws ecs update-service`, on pushes to `dev`. It needs
+    push to ECR → `aws lambda update-function-code`, on pushes to `dev`. It needs
     `permissions: id-token: write` and a `concurrency:` group, every action pinned to a full
     commit SHA with the tag in a comment, and a preflight of the repository variables and the
     OIDC role that skips cleanly (or exits non-zero) while they do not exist. Do not add a
@@ -140,5 +149,5 @@ ACCEPTANCE CRITERIA
 - `uv run pytest -q` and `uv run ruff check .` pass; the Docker image builds.
 - `terraform init -backend=false && terraform validate` passes in `infra/`.
 - `.github/workflows/deploy.yml` runs on `dev`: with the OIDC role and repository variables in
-  place it publishes to ECR and updates both ECS services, and while they are absent it skips
-  or fails loudly rather than shipping a service that serves nothing.
+  place it publishes to ECR and updates the function, and while they are absent it skips or
+  fails loudly rather than shipping a function that answers nothing.
