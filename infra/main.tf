@@ -62,10 +62,28 @@ variable "vector_backend" {
   }
 }
 
+variable "ollama_base_url" {
+  description = "Ollama HTTP API the chain calls. Must be reachable from the tasks: a localhost default only works for a local run."
+  type        = string
+  default     = "http://localhost:11434"
+}
+
+variable "ollama_model" {
+  description = "Model the chain generates with, and embeds with unless embedding_model overrides it."
+  type        = string
+  default     = "llama3.1:8b"
+}
+
+variable "embedding_model" {
+  description = "Embedding model served by the same Ollama API, used at index time and at query time."
+  type        = string
+  default     = "nomic-embed-text"
+}
+
 variable "api_desired_count" {
-  description = "Number of API tasks. Two keeps the service up while one task deploys."
+  description = "Number of API tasks. Two keeps the service up while one task deploys, at twice the Fargate cost."
   type        = number
-  default     = 2
+  default     = 1
 }
 
 variable "ui_desired_count" {
@@ -110,7 +128,7 @@ variable "rag_secret_json" {
   default     = <<-JSON
     {
       "PINECONE_API_KEY": "REPLACE_ME",
-      "OPENAI_API_KEY": "REPLACE_ME",
+      "OLLAMA_API_KEY": "",
       "MLFLOW_TRACKING_URI": "REPLACE_ME"
     }
   JSON
@@ -122,12 +140,15 @@ locals {
   container_env = [
     { name = "PORT", value = "8000" },
     { name = "VECTOR_BACKEND", value = var.vector_backend },
+    { name = "OLLAMA_BASE_URL", value = var.ollama_base_url },
+    { name = "OLLAMA_MODEL", value = var.ollama_model },
+    { name = "EMBEDDING_MODEL", value = var.embedding_model },
   ]
   # Keys the container reads out of Secrets Manager. Keep in sync with the JSON
   # body above and with the variables documented in README.md.
   secret_env = [
     { name = "PINECONE_API_KEY", valueFrom = "${local.secret_arn}:PINECONE_API_KEY::" },
-    { name = "OPENAI_API_KEY", valueFrom = "${local.secret_arn}:OPENAI_API_KEY::" },
+    { name = "OLLAMA_API_KEY", valueFrom = "${local.secret_arn}:OLLAMA_API_KEY::" },
     { name = "MLFLOW_TRACKING_URI", valueFrom = "${local.secret_arn}:MLFLOW_TRACKING_URI::" },
   ]
 }

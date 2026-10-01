@@ -4,8 +4,14 @@ environment = "staging"
 alert_email = "you@example.com"
 
 # Only uncomment what differs from the defaults in main.tf: project, region,
-# image_tag, vector_backend, api_desired_count, ui_desired_count,
-# monthly_budget_usd, github_repo, github_branch, create_github_oidc_provider.
+# image_tag, vector_backend, ollama_base_url, ollama_model, embedding_model,
+# api_desired_count, ui_desired_count, monthly_budget_usd, github_repo,
+# github_branch, create_github_oidc_provider.
+
+# The default is localhost, which the tasks cannot reach: point this at an
+# endpoint that is reachable from AWS and that asks for a token.
+# ollama_base_url = "https://ollama.example.com"
+# ollama_model    = "llama3.1:8b"
 
 # AWS allows one token.actions.githubusercontent.com provider per account. Set
 # this to false when the account already has one, or apply fails with
@@ -13,13 +19,13 @@ alert_email = "you@example.com"
 # create_github_oidc_provider = false
 
 # Placeholders: replace the value after apply, so real credentials never reach
-# a .tfvars file.
+# a .tfvars file. Leave OLLAMA_API_KEY as "" when the endpoint needs no token.
 #   aws secretsmanager put-secret-value --secret-id <app_secret_arn> \
 #     --secret-string file://secret.json
 # rag_secret_json = <<-JSON
 #   {
 #     "PINECONE_API_KEY": "...",
-#     "OPENAI_API_KEY": "...",
+#     "OLLAMA_API_KEY": "",
 #     "MLFLOW_TRACKING_URI": "..."
 #   }
 # JSON

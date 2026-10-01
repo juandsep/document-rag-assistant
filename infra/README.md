@@ -42,14 +42,37 @@ in `uplift-modeling-pipeline`: move it to an S3 backend before a second person
 applies this. Use one state per environment and never reuse the production
 state locally.
 
-### Before the first apply
+## What it costs
+
+Running 24/7 in `us-east-1`, idle:
+
+| Item | Monthly |
+|---|---|
+| API task, 0.5 vCPU / 1 GB | ~$18 |
+| UI task, 0.25 vCPU / 512 MB | ~$9 |
+| Application Load Balancer | ~$21 |
+| ECR, S3, Logs, Secrets Manager | <$5 |
+| **Total, with `api_desired_count = 1`** | **~$53** |
+
+`api_desired_count = 2` adds another ~$18. The VPC is the default one on
+purpose: NAT gateways alone would add ~$32 before any task runs. Fargate bills
+per second, so `aws ecs update-service --desired-count 0` on both services is
+the way to park the whole thing between demos; the ALB is the part that keeps
+billing.
+
+## Before the first apply
 
 1. `alert_email` has no default — it must come from `terraform.tfvars`.
-2. The account gets an IAM provider for `token.actions.githubusercontent.com`.
+2. `ollama_base_url` defaults to `http://localhost:11434`, which is only right
+   for a local run: the tasks cannot reach a laptop. It has to point at an
+   endpoint reachable from AWS, and that endpoint should require a token
+   (`OLLAMA_API_KEY`), because an open Ollama server is an open proxy to your
+   GPU.
+3. The account gets an IAM provider for `token.actions.githubusercontent.com`.
    AWS allows one per account: if it already exists, set
    `create_github_oidc_provider = false` or apply fails with
    `EntityAlreadyExists`.
-3. The secret is created with `REPLACE_ME` placeholders. Replace the value
+4. The secret is created with `REPLACE_ME` placeholders. Replace the value
    after apply, so real credentials never sit in a `.tfvars`:
 
    ```bash
@@ -57,10 +80,16 @@ state locally.
      --secret-string file://secret.json
    ```
 
-4. Take `deploy_role_arn` from the outputs and set it as the
+   Leave `OLLAMA_API_KEY` as `""` when the endpoint needs no token.
+
+5. Take `deploy_role_arn` from the outputs and set it as the
    `AWS_DEPLOY_ROLE` repository variable for the deploy workflow.
-5. The first deploy pushes the image under the `image_tag` CI passes;
+6. The first deploy pushes the image under the `image_tag` CI passes;
    `bootstrap` only exists to make the services schedulable before that.
+7. The ALB serves plain HTTP on port 80 and has no authentication: anyone with
+   the DNS name can query the corpus and spend model time. Put it behind an ACM
+   certificate and restrict the security group to known addresses before this
+   faces the internet.
 
 ## Conventions
 

@@ -132,8 +132,8 @@ resource "aws_ecs_task_definition" "ui" {
   family                   = "${local.name_prefix}-ui"
   requires_compatibilities = ["FARGATE"]
   network_mode             = "awsvpc"
-  cpu                      = 512
-  memory                   = 1024
+  cpu                      = 256
+  memory                   = 512
   execution_role_arn       = aws_iam_role.execution.arn
   task_role_arn            = aws_iam_role.task.arn
 
@@ -153,12 +153,11 @@ resource "aws_ecs_task_definition" "ui" {
       protocol      = "tcp"
     }]
 
-    # The UI calls the API through the load balancer, so no service discovery
-    # is needed for it to find the other service.
-    environment = concat(local.container_env, [
+    # The UI only renders what the API returns: it calls it through the load
+    # balancer and needs neither the model nor the vector store credentials.
+    environment = [
       { name = "RAG_API_URL", value = "http://${aws_lb.main.dns_name}" },
-    ])
-    secrets = local.secret_env
+    ]
 
     logConfiguration = {
       logDriver = "awslogs"
