@@ -33,3 +33,6 @@ infra/tfplan
 .DS_Store
 .idea/
 .vscode/
+
+# Local vector index (built by scripts/index_docs.py)
+index/
