@@ -23,6 +23,11 @@ COPY --from=builder /opt/venv /opt/venv
 COPY --from=builder /app/src ./src
 COPY --from=builder /app/pyproject.toml ./
 
+# Lambda Web Adapter: makes this same image serve HTTP on Lambda without
+# touching the app. Inert everywhere else, so docker run and uvicorn keep
+# working. See infra/lambda.tf for the port and readiness path it is given.
+COPY --from=public.ecr.aws/awsguru/aws-lambda-adapter:1.1.0 /lambda-adapter /opt/extensions/lambda-adapter
+
 # Non-root: the serving process must not be able to write outside its own home.
 RUN useradd --create-home --uid 10001 app && chown -R app:app /app
 USER app
