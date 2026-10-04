@@ -62,6 +62,18 @@ variable "vector_backend" {
   }
 }
 
+variable "pinecone_index" {
+  description = "Pinecone index with integrated embedding (llama-text-embed-v2, field map text)."
+  type        = string
+  default     = "document-rag"
+}
+
+variable "pinecone_namespace" {
+  description = "Index version to serve, as printed by scripts/index_docs.py. Empty serves the newest; pin one to switch versions only after its evaluation passes."
+  type        = string
+  default     = ""
+}
+
 variable "ollama_base_url" {
   description = "Ollama HTTP API the chain calls. Must be reachable from Lambda: the localhost default only works for a local run."
   type        = string
@@ -175,6 +187,8 @@ locals {
   # APP_SECRET_PARAMETER.
   function_env = {
     VECTOR_BACKEND       = var.vector_backend
+    PINECONE_INDEX       = var.pinecone_index
+    PINECONE_NAMESPACE   = var.pinecone_namespace
     OLLAMA_BASE_URL      = var.ollama_base_url
     OLLAMA_MODEL         = var.ollama_model
     EMBEDDING_MODEL      = var.embedding_model

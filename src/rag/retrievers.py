@@ -1,8 +1,11 @@
 """Vector retrieval adapters behind one seam.
 
-`get_retriever` picks the backend from `VECTOR_BACKEND`. The embedded `local`
-backend is the deployed default; Pinecone and OpenSearch are still stubs.
-Embeddings come from the Ollama endpoint, the same one the chain generates with.
+`get_retriever` picks the backend from `VECTOR_BACKEND`. Pinecone is the
+deployed backend and embeds server-side; the embedded `local` backend is for
+development and embeds through Ollama. OpenSearch is still a stub.
+
+Every `upsert` writes a new index version and returns its name; nothing
+overwrites the version that is serving.
 """
 
 from __future__ import annotations
@@ -14,8 +17,9 @@ import re
 import urllib.request
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Protocol
+from typing import Any, Protocol
 
 from rag.ingest import Chunk
 
@@ -30,7 +34,7 @@ class Retrieved:
 
 
 class Retriever(Protocol):
-    def upsert(self, chunks: list[Chunk]) -> None: ...
+    def upsert(self, chunks: list[Chunk]) -> str: ...
 
     def query(self, text: str, top_k: int = 5) -> list[Retrieved]: ...
 
@@ -69,7 +73,7 @@ class LocalRetriever:
         files = [p for p in self.path.glob("v*.json") if re.fullmatch(r"v\d+", p.stem)]
         return sorted(files, key=lambda p: int(p.stem[1:]))
 
-    def upsert(self, chunks: list[Chunk]) -> None:
+    def upsert(self, chunks: list[Chunk]) -> str:
         vectors = self.embed([chunk.text for chunk in chunks]) if chunks else []
         rows = [
             {"doc_id": c.doc_id, "index": c.index, "text": c.text, "vector": v}
@@ -83,6 +87,7 @@ class LocalRetriever:
         partial = target.with_suffix(".tmp")
         partial.write_text(json.dumps(rows))
         partial.replace(target)
+        return target.stem
 
     def query(self, text: str, top_k: int = 5) -> list[Retrieved]:
         versions = self._versions()
@@ -104,15 +109,67 @@ class LocalRetriever:
 
 
 class PineconeRetriever:
-    def __init__(self, index: str | None = None, api_key: str | None = None) -> None:
-        self.index = index or os.getenv("PINECONE_INDEX", "")
-        self.api_key = api_key or os.getenv("PINECONE_API_KEY", "")
+    """A Pinecone index with integrated embedding, one namespace per version.
 
-    def upsert(self, chunks: list[Chunk]) -> None:
-        raise NotImplementedError("Connect Pinecone: index.upsert(...)")
+    The index embeds the `text` field itself (`llama-text-embed-v2`), at upsert
+    and at query time, so both sides always use the same model. `upsert` writes
+    a new `v<UTC timestamp>` namespace. `query` reads `PINECONE_NAMESPACE` when
+    it is set, which pins the serving version, else the newest one.
+    """
+
+    # Upsert limit per request for indexes with integrated embedding.
+    BATCH = 96
+
+    def __init__(self, index: Any = None, namespace: str | None = None) -> None:
+        self._index = index
+        self._namespace = namespace or os.getenv("PINECONE_NAMESPACE")
+
+    @property
+    def index(self) -> Any:
+        # Built on first use: importing this module needs no key or network.
+        if self._index is None:
+            from pinecone import Pinecone
+
+            client = Pinecone(api_key=os.environ["PINECONE_API_KEY"])
+            self._index = client.Index(os.getenv("PINECONE_INDEX", "document-rag"))
+        return self._index
+
+    def upsert(self, chunks: list[Chunk]) -> str:
+        namespace = datetime.now(UTC).strftime("v%Y%m%d%H%M%S")
+        records = [
+            {"_id": f"{c.doc_id}#{c.index}", "text": c.text, "doc_id": c.doc_id}
+            for c in chunks
+        ]
+        for start in range(0, len(records), self.BATCH):
+            self.index.upsert_records(
+                namespace=namespace, records=records[start : start + self.BATCH]
+            )
+        return namespace
+
+    def _serving(self) -> str:
+        if not self._namespace:
+            names = [
+                ns.name
+                for page in self.index.list_namespaces(prefix="v")
+                for ns in page.namespaces
+            ]
+            if not names:
+                raise LookupError("No index version in the Pinecone index")
+            # Timestamps sort as text; cached, so only the first query pays.
+            self._namespace = max(names)
+        return self._namespace
 
     def query(self, text: str, top_k: int = 5) -> list[Retrieved]:
-        raise NotImplementedError("Connect Pinecone: index.query(...)")
+        response = self.index.search(
+            namespace=self._serving(),
+            top_k=top_k,
+            inputs={"text": text},
+            fields=["doc_id", "text"],
+        )
+        return [
+            Retrieved(hit.fields["doc_id"], hit.fields["text"], hit.score)
+            for hit in response.result.hits
+        ]
 
 
 class OpenSearchRetriever:
@@ -120,7 +177,7 @@ class OpenSearchRetriever:
         self.host = host or os.getenv("OPENSEARCH_HOST", "")
         self.index = index or os.getenv("OPENSEARCH_INDEX", "")
 
-    def upsert(self, chunks: list[Chunk]) -> None:
+    def upsert(self, chunks: list[Chunk]) -> str:
         raise NotImplementedError("Connect OpenSearch: helpers.bulk(...)")
 
     def query(self, text: str, top_k: int = 5) -> list[Retrieved]:

@@ -118,7 +118,8 @@ git-ignored `.env`.
 |---|---|
 | `VECTOR_BACKEND` | `local` (code default, development) \| `pinecone` (deployed) \| `opensearch` |
 | `LOCAL_INDEX_DIR` | directory of the `local` index versions (default `index/`) |
-| `PINECONE_API_KEY` / `PINECONE_INDEX` | Pinecone credentials |
+| `PINECONE_API_KEY` / `PINECONE_INDEX` | Pinecone key and index (default `document-rag`) |
+| `PINECONE_NAMESPACE` | index version to serve; empty serves the newest |
 | `OPENSEARCH_HOST` / `OPENSEARCH_INDEX` | OpenSearch endpoint |
 | `MLFLOW_TRACKING_URI` | tracking backend |
 | `OLLAMA_BASE_URL` / `OLLAMA_MODEL` / `OLLAMA_API_KEY` | Ollama endpoint, generation model and bearer token |

@@ -11,7 +11,7 @@ dependencies = [
     "fastapi>=0.142.0",
     "mlflow>=3.16.1",
     "opensearch-py>=3.2.0",
-    "pinecone-client>=6.0.0",
+    "pinecone>=10.0.0",
     "streamlit>=1.64.0",
     "uvicorn>=0.54.0",
 ]

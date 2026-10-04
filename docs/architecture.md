@@ -34,9 +34,12 @@ documents ──▶ load ──▶ chunk ──▶ embed ──▶ upsert (index
 Chunking is a sliding window (`ingest.chunk_text`) so adjacent passages overlap
 and a fact split across a boundary is still retrievable.
 
-Reindexing writes a **new** index version and never overwrites an older one.
-Today the newest version serves immediately; switching only after the
-evaluation passes is planned with F5.
+Reindexing writes a **new** index version and never overwrites an older one:
+a `v<UTC timestamp>` namespace in Pinecone, a `vN.json` file locally. The
+newest version serves unless `PINECONE_NAMESPACE` pins one; pinning is how a
+version goes live only after its evaluation passes (the evaluation itself
+arrives with F5). Pinecone embeds both the chunks and the query with the same
+model, so the two can never drift apart.
 
 ## Evaluation *(planned)*
 
