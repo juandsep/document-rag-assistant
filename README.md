@@ -20,7 +20,7 @@ runs on AWS for about $0.10/month idle, plus LLM tokens.
 ## How it works
 
 ```
-documents ──▶ chunk ──▶ Pinecone (embeds and stores)
+documents ──▶ chunk ──▶ Qdrant Cloud (embeds and stores)
                               │
 POST /query ──▶ top-k passages ──▶ LLM (Ollama Cloud) ──▶ answer + sources
       │
@@ -29,8 +29,8 @@ POST /query ──▶ top-k passages ──▶ LLM (Ollama Cloud) ──▶ answ
 ```
 
 One Lambda function serves the FastAPI app through a Function URL: no load
-balancer, no VPC, nothing billed while idle. Pinecone embeds and indexes the
-chunks on its free tier, in the same region as the function. The LLM is Ollama
+balancer, no VPC, nothing billed while idle. Qdrant Cloud embeds and indexes the
+chunks on its free tier with a multilingual model. The LLM is Ollama
 Cloud. Credentials sit in an SSM SecureString. A local Grafana reads
 CloudWatch for latency, errors and spend; the portfolio's shared MLflow keeps
 the evaluation runs. The Streamlit UI runs locally against the deployed API.
@@ -61,7 +61,7 @@ uv run streamlit run src/rag/ui.py
 Configuration comes from environment variables, listed in
 [infra/README.md](infra/README.md#configuration).
 
-**Stack:** FastAPI, Pinecone, Ollama Cloud, MLflow, Streamlit, AWS Lambda +
+**Stack:** FastAPI, Qdrant, Ollama Cloud, MLflow, Streamlit, AWS Lambda +
 Function URL, ECR, S3, SSM, CloudWatch + Grafana, uv + ruff + pytest,
 Terraform, GitHub Actions.
 

@@ -69,7 +69,8 @@ can spend even if someone finds it.
 
 1. `alert_email` has no default — it must come from `terraform.tfvars`. AWS
    mails a confirmation link for the alarm topic; alarms reach nobody until it
-   is clicked.
+   is clicked. Set `qdrant_url` there too: the Qdrant Cloud cluster URL. Its
+   API key goes in the SecureString (step 5), never in a `.tfvars`.
 2. `ollama_base_url` defaults to `http://localhost:11434`, which is only right
    for a local run: Lambda cannot reach a laptop. It has to point at an endpoint
    reachable from the internet, and that endpoint should require a token
@@ -116,10 +117,10 @@ git-ignored `.env`.
 
 | Variable | Description |
 |---|---|
-| `VECTOR_BACKEND` | `local` (code default, development) \| `pinecone` (deployed) \| `opensearch` |
+| `VECTOR_BACKEND` | `local` (code default, development) \| `qdrant` (deployed) |
 | `LOCAL_INDEX_DIR` | directory of the `local` index versions (default `index/`) |
-| `PINECONE_API_KEY` / `PINECONE_INDEX` | Pinecone credentials |
-| `OPENSEARCH_HOST` / `OPENSEARCH_INDEX` | OpenSearch endpoint |
+| `QDRANT_URL` / `QDRANT_API_KEY` | Qdrant Cloud cluster and its key |
+| `QDRANT_ALIAS` | alias queries go through (default `document-rag`) |
 | `MLFLOW_TRACKING_URI` | tracking backend |
 | `OLLAMA_BASE_URL` / `OLLAMA_MODEL` / `OLLAMA_API_KEY` | Ollama endpoint, generation model and bearer token |
 | `EMBEDDING_MODEL` | embedding model the `local` backend asks Ollama for |
@@ -128,9 +129,9 @@ git-ignored `.env`.
 
 ## Conventions
 
-- The vector store lives outside AWS: Pinecone serverless (`vector_backend`
-  defaults to `pinecone`). Only its key and the backend name reach the
-  function. `local` is for development; the image ships no index.
+- The vector store lives outside AWS: Qdrant Cloud's free cluster
+  (`vector_backend` defaults to `qdrant`). Only its URL, its key and the
+  backend name reach the function. `local` is for development; the image ships no index.
 - No credential is committed: the secret body lives in Parameter Store and in
   the local, git-ignored state.
 - The image is the same one that runs locally: the Lambda Web Adapter adds an

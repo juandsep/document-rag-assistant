@@ -1,0 +1,29 @@
+# Qdrant Cloud suspends a free cluster after a week without requests and
+# deletes it after four. One read query twice a week keeps the demo's index
+# alive at no cost. Skips cleanly until QDRANT_URL and QDRANT_API_KEY exist.
+name: keepalive
+
+on:
+  schedule:
+    - cron: "17 6 * * 1,4" # Monday and Thursday, 06:17 UTC
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  qdrant:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      QDRANT_URL: ${{ vars.QDRANT_URL }}
+      QDRANT_API_KEY: ${{ secrets.QDRANT_API_KEY }}
+    steps:
+      - name: Query the serving alias
+        run: |
+          if [ -z "$QDRANT_URL" ] || [ -z "$QDRANT_API_KEY" ]; then
+            echo "::notice::QDRANT_URL or QDRANT_API_KEY not set; skipping."
+            exit 0
+          fi
+          curl --fail-with-body -sS -X POST -H "api-key: $QDRANT_API_KEY" \
+            -H "content-type: application/json" -d '{"exact": false}' \
+            "$QDRANT_URL/collections/document-rag/points/count"

@@ -1,8 +1,11 @@
 """Vector retrieval adapters behind one seam.
 
-`get_retriever` picks the backend from `VECTOR_BACKEND`. The embedded `local`
-backend is the deployed default; Pinecone and OpenSearch are still stubs.
-Embeddings come from the Ollama endpoint, the same one the chain generates with.
+`get_retriever` picks the backend from `VECTOR_BACKEND`. Qdrant Cloud is the
+deployed backend and embeds server-side; the embedded `local` backend is for
+development and embeds through Ollama.
+
+Every `upsert` writes a new index version and returns its name; nothing
+overwrites the version that is serving.
 """
 
 from __future__ import annotations
@@ -12,10 +15,12 @@ import math
 import os
 import re
 import urllib.request
+import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Protocol
+from typing import Any, Protocol
 
 from rag.ingest import Chunk
 
@@ -30,7 +35,7 @@ class Retrieved:
 
 
 class Retriever(Protocol):
-    def upsert(self, chunks: list[Chunk]) -> None: ...
+    def upsert(self, chunks: list[Chunk]) -> str: ...
 
     def query(self, text: str, top_k: int = 5) -> list[Retrieved]: ...
 
@@ -69,7 +74,7 @@ class LocalRetriever:
         files = [p for p in self.path.glob("v*.json") if re.fullmatch(r"v\d+", p.stem)]
         return sorted(files, key=lambda p: int(p.stem[1:]))
 
-    def upsert(self, chunks: list[Chunk]) -> None:
+    def upsert(self, chunks: list[Chunk]) -> str:
         vectors = self.embed([chunk.text for chunk in chunks]) if chunks else []
         rows = [
             {"doc_id": c.doc_id, "index": c.index, "text": c.text, "vector": v}
@@ -83,6 +88,7 @@ class LocalRetriever:
         partial = target.with_suffix(".tmp")
         partial.write_text(json.dumps(rows))
         partial.replace(target)
+        return target.stem
 
     def query(self, text: str, top_k: int = 5) -> list[Retrieved]:
         versions = self._versions()
@@ -103,37 +109,111 @@ class LocalRetriever:
         return scored[:top_k]
 
 
-class PineconeRetriever:
-    def __init__(self, index: str | None = None, api_key: str | None = None) -> None:
-        self.index = index or os.getenv("PINECONE_INDEX", "")
-        self.api_key = api_key or os.getenv("PINECONE_API_KEY", "")
+class QdrantRetriever:
+    """Qdrant Cloud with server-side embedding, one collection per version.
 
-    def upsert(self, chunks: list[Chunk]) -> None:
-        raise NotImplementedError("Connect Pinecone: index.upsert(...)")
+    Qdrant embeds with `intfloat/multilingual-e5-small`, free on Cloud
+    Inference, so chunks and queries always share one model. `upsert` writes a
+    new `<alias>-v<UTC timestamp>` collection; queries go through the alias
+    (`QDRANT_ALIAS`), which `promote` moves atomically. The first version is
+    promoted on its own, later ones only when asked.
+    """
+
+    MODEL = "intfloat/multilingual-e5-small"
+    SIZE = 384
+    BATCH = 64
+
+    def __init__(self, client: Any = None, alias: str | None = None) -> None:
+        self._client = client
+        self.alias = alias or os.getenv("QDRANT_ALIAS", "document-rag")
+
+    @property
+    def client(self) -> Any:
+        # Built on first use: importing this module needs no key or network.
+        if self._client is None:
+            from qdrant_client import QdrantClient
+
+            self._client = QdrantClient(
+                url=os.environ["QDRANT_URL"],
+                api_key=os.environ["QDRANT_API_KEY"],
+                cloud_inference=True,
+            )
+        return self._client
+
+    def _document(self, text: str) -> Any:
+        from qdrant_client import models
+
+        return models.Document(text=text, model=self.MODEL)
+
+    def upsert(self, chunks: list[Chunk]) -> str:
+        from qdrant_client import models
+
+        version = datetime.now(UTC).strftime(f"{self.alias}-v%Y%m%d%H%M%S%f")
+        self.client.create_collection(
+            version,
+            vectors_config=models.VectorParams(
+                size=self.SIZE, distance=models.Distance.COSINE
+            ),
+        )
+        points = [
+            models.PointStruct(
+                id=str(uuid.uuid5(uuid.NAMESPACE_URL, f"{c.doc_id}#{c.index}")),
+                # e5 models are trained with these prefixes on each side.
+                vector=self._document(f"passage: {c.text}"),
+                payload={"doc_id": c.doc_id, "text": c.text},
+            )
+            for c in chunks
+        ]
+        for start in range(0, len(points), self.BATCH):
+            self.client.upsert(version, points[start : start + self.BATCH])
+        if not self._serving():
+            self.promote(version)
+        return version
+
+    def _serving(self) -> str | None:
+        aliases = self.client.get_aliases().aliases
+        return next(
+            (a.collection_name for a in aliases if a.alias_name == self.alias), None
+        )
+
+    def promote(self, version: str) -> None:
+        """Point the alias at `version`; both steps apply as one operation."""
+        from qdrant_client import models
+
+        operations = []
+        if self._serving():
+            operations.append(
+                models.DeleteAliasOperation(
+                    delete_alias=models.DeleteAlias(alias_name=self.alias)
+                )
+            )
+        operations.append(
+            models.CreateAliasOperation(
+                create_alias=models.CreateAlias(
+                    collection_name=version, alias_name=self.alias
+                )
+            )
+        )
+        self.client.update_collection_aliases(operations)
 
     def query(self, text: str, top_k: int = 5) -> list[Retrieved]:
-        raise NotImplementedError("Connect Pinecone: index.query(...)")
-
-
-class OpenSearchRetriever:
-    def __init__(self, host: str | None = None, index: str | None = None) -> None:
-        self.host = host or os.getenv("OPENSEARCH_HOST", "")
-        self.index = index or os.getenv("OPENSEARCH_INDEX", "")
-
-    def upsert(self, chunks: list[Chunk]) -> None:
-        raise NotImplementedError("Connect OpenSearch: helpers.bulk(...)")
-
-    def query(self, text: str, top_k: int = 5) -> list[Retrieved]:
-        raise NotImplementedError("Connect OpenSearch: client.search(...)")
+        response = self.client.query_points(
+            self.alias,
+            query=self._document(f"query: {text}"),
+            limit=top_k,
+            with_payload=True,
+        )
+        return [
+            Retrieved(p.payload["doc_id"], p.payload["text"], p.score)
+            for p in response.points
+        ]
 
 
 def get_retriever(backend: str | None = None) -> Retriever:
-    """Return the retriever named by `VECTOR_BACKEND` (local|pinecone|opensearch)."""
+    """Return the retriever named by `VECTOR_BACKEND` (local|qdrant)."""
     backend = (backend or os.getenv("VECTOR_BACKEND", "local")).lower()
     if backend == "local":
         return LocalRetriever()
-    if backend == "pinecone":
-        return PineconeRetriever()
-    if backend == "opensearch":
-        return OpenSearchRetriever()
+    if backend == "qdrant":
+        return QdrantRetriever()
     raise ValueError(f"Unknown VECTOR_BACKEND: {backend!r}")
