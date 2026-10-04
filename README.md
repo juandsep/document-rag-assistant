@@ -41,10 +41,10 @@ query ──▶ POST /query ──▶ retriever (top-k) ──▶ LLM ──▶ 
 | API | FastAPI + Uvicorn |
 | Vector DB | Pinecone **or** OpenSearch (selected by `VECTOR_BACKEND`) |
 | Ingestion | chunking plus embeddings (`sentence-transformers` / provider) |
-| Generation | configurable LLM provider (credential via secret) |
+| Generation | Ollama HTTP API (generation + embeddings), token from the secret |
 | Monitoring | MLflow (chain traces + retriever evaluation) |
 | UI | Streamlit (Gradio as an alternative) |
-| Deployment | AWS ECS Fargate + ALB, images in ECR, corpus in S3 |
+| Deployment | AWS Lambda (container image) + Function URL, image in ECR, corpus in S3 |
 | Secrets | AWS Secrets Manager (OIDC federated auth in CI) |
 | Observability | CloudWatch Logs and metrics |
 | Environment | **uv** (`pyproject.toml` + `uv.lock`) |
@@ -62,7 +62,7 @@ Roadmap in [`PLAN.md`](./PLAN.md).
 - [ ] **F4** · API: `POST /query`, `GET /health`, Pydantic validation
 - [ ] **F5** · MLflow monitoring and offline retriever evaluation
 - [ ] **F6** · Streamlit UI (chat plus sources)
-- [ ] **F7** · CI/CD and AWS deployment (ECR + ECS Fargate + ALB)
+- [ ] **F7** · CI/CD and AWS deployment (ECR + Lambda + Function URL)
 
 ## Repository layout
 
@@ -120,12 +120,20 @@ uv run streamlit run src/rag/ui.py
 | `PINECONE_API_KEY` / `PINECONE_INDEX` | Pinecone credentials |
 | `OPENSEARCH_HOST` / `OPENSEARCH_INDEX` | OpenSearch endpoint |
 | `MLFLOW_TRACKING_URI` | tracking backend |
-| `LLM_PROVIDER` / `OPENAI_API_KEY` | LLM provider and credential |
+| `OLLAMA_BASE_URL` / `OLLAMA_MODEL` | Ollama endpoint and generation model |
+| `EMBEDDING_MODEL` | embedding model served by the same Ollama endpoint |
+| `APP_SECRET_ARN` | secret the function reads its keys from (Lambda; local runs use `OLLAMA_API_KEY`) |
 | `RAG_API_URL` | API base URL consumed by the UI |
 
 ## Deployment
 
-`docker build -f docker/Dockerfile -t document-rag-assistant .` → push to **ECR** → `aws ecs update-service` (`rag-api` and `rag-ui` services behind one ALB).
+`docker build -f docker/Dockerfile -t document-rag-assistant .` → push to **ECR** → `aws lambda update-function-code`.
+The image carries the [Lambda Web Adapter](https://github.com/aws/lambda-web-adapter), so the same
+container serves HTTP on Lambda and under `docker run`. The Function URL is the entry point: no
+load balancer to pay for while idle. Lambda bills per request and sits in the free tier at demo
+volume, which is why the deployed shape is serverless rather than Fargate behind an ALB.
+The Streamlit UI is not deployed — it needs a long-lived websocket server, so it runs locally
+against the deployed API (`RAG_API_URL=<function url> uv run streamlit run src/rag/ui.py`).
 Terraform and notes in [`infra/`](./infra/README.md); pipeline in `.github/workflows/`.
 
 ## Success metrics
@@ -140,4 +148,4 @@ Structure, CI and conventions follow the reference pipeline `uplift-modeling-pip
 
 ---
 
-**Stack:** Python 3.11 · uv · FastAPI · Pinecone/OpenSearch · MLflow · Streamlit · AWS ECS Fargate · GitHub Actions
+**Stack:** Python 3.11 · uv · FastAPI · Ollama · Pinecone/OpenSearch · MLflow · Streamlit · AWS Lambda + Function URL · GitHub Actions
