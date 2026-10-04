@@ -1,0 +1,11 @@
+/Users/sepulveda/Code/portfolio/document-rag-assistant/.github/workflows/ci.yml
+/Users/sepulveda/Code/portfolio/document-rag-assistant/.github/workflows/keepalive.yml
+/Users/sepulveda/Code/portfolio/document-rag-assistant/CONTRIBUTING.md
+/Users/sepulveda/Code/portfolio/document-rag-assistant/PLAN.md
+/Users/sepulveda/Code/portfolio/document-rag-assistant/README.md
+/Users/sepulveda/Code/portfolio/document-rag-assistant/docs/architecture.md
+/Users/sepulveda/Code/portfolio/document-rag-assistant/infra/README.md
+/Users/sepulveda/Code/portfolio/document-rag-assistant/monitoring/README.md
+/Users/sepulveda/Code/portfolio/document-rag-assistant/monitoring/docker-compose.yml
+/Users/sepulveda/Code/portfolio/document-rag-assistant/monitoring/grafana/provisioning/dashboards/rag.yml
+/Users/sepulveda/Code/portfolio/document-rag-assistant/monitoring/grafana/provisioning/datasources/cloudwatch.yml
