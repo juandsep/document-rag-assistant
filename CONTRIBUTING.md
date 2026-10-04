@@ -19,8 +19,8 @@ git push -u origin feat/short-description
 
 Open a pull request into `dev`, then delete the branch after merging.
 
-Prefixes: `feat/` for behaviour, `fix/` for defects, `chore/` for tooling and
-documentation. Keep one concern per branch.
+Prefixes: `feat/` for behaviour, `fix/` for defects, `chore/` for tooling,
+`docs/` for documentation only. Keep one concern per branch.
 
 Releasing means a pull request from `dev` into `main`.
 
@@ -56,8 +56,9 @@ first, then rewrite history. Deleting the commit is not enough.
 
 ## Retrieval and prompt changes
 
-- Every change to chunking, embeddings, the retriever or the prompt ships with
-  the offline evaluation (precision@k / recall@k) attached to the pull request.
+- Once the offline evaluation exists (F5), every change to chunking, embeddings,
+  the retriever or the prompt ships with its precision@k / recall@k attached to
+  the pull request.
 - Answers must keep citing their sources; a change that drops citations is a
   regression, not a simplification.
 - Reindexing is idempotent and versioned: a new corpus version gets a new index,

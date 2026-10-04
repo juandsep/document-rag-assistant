@@ -104,9 +104,9 @@ curl --aws-sigv4 "aws:amz:us-east-1:lambda" \
 
 ## Conventions
 
-- The vector store is either embedded in the image (`VECTOR_BACKEND=local`) or
-  managed outside this module (`qdrant`, `pinecone`, `opensearch`); only its
-  credentials and the backend name reach the function.
+- The vector store lives outside AWS: Pinecone serverless (`vector_backend`
+  defaults to `pinecone`). Only its key and the backend name reach the
+  function. `local` is for development; the image ships no index.
 - No credential is committed: the secret body lives in Secrets Manager and in
   the local, git-ignored state.
 - The image is the same one that runs locally: the Lambda Web Adapter adds an

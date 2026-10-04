@@ -52,13 +52,13 @@ variable "image_tag" {
 }
 
 variable "vector_backend" {
-  description = "Retriever the chain talks to: local, qdrant, pinecone or opensearch."
+  description = "Retriever the chain talks to: pinecone (deployed), local (development only, the image ships no index) or opensearch."
   type        = string
-  default     = "local"
+  default     = "pinecone"
 
   validation {
-    condition     = contains(["local", "qdrant", "pinecone", "opensearch"], var.vector_backend)
-    error_message = "vector_backend must be local, qdrant, pinecone or opensearch."
+    condition     = contains(["local", "pinecone", "opensearch"], var.vector_backend)
+    error_message = "vector_backend must be local, pinecone or opensearch."
   }
 }
 

@@ -2,11 +2,14 @@
 
 ## Request path
 
+This page describes the target design. What already works is tracked in
+[`PLAN.md`](../PLAN.md); sections marked *(planned)* do not exist in code yet.
+
 ```
 POST /query { q }
       │
       ▼
-  embed(q) ──▶ Vector DB (Pinecone / OpenSearch) ──▶ top-k chunks
+  embed(q) ──▶ Vector DB (Pinecone / local) ──▶ top-k chunks
       │
       ▼
   prompt(chunks, q) ──▶ LLM ──▶ answer + cited sources
@@ -31,16 +34,17 @@ documents ──▶ load ──▶ chunk ──▶ embed ──▶ upsert (index
 Chunking is a sliding window (`ingest.chunk_text`) so adjacent passages overlap
 and a fact split across a boundary is still retrievable.
 
-Reindexing writes a **new** index version; the serving index is switched only
-after the evaluation passes.
+Reindexing writes a **new** index version and never overwrites an older one.
+Today the newest version serves immediately; switching only after the
+evaluation passes is planned with F5.
 
-## Evaluation
+## Evaluation *(planned)*
 
 `monitoring.py` logs per-query traces to MLflow. On top of those, an offline
 evaluation runs precision@k and recall@k over a labelled question set, which is
 what turns "the answers feel better" into a number attached to a pull request.
 
-## Failure behaviour
+## Failure behaviour *(planned)*
 
 - **Vector DB unavailable** — `/query` fails fast with `503`; answering without
   retrieval would produce uncited claims.
@@ -56,8 +60,8 @@ HTTPS and a public hostname with no load balancer, and no bill while nobody
 asks anything. The image is built from `docker/Dockerfile` and pushed to ECR;
 the Lambda Web Adapter inside it serves the same FastAPI app that runs locally.
 
-The corpus lives in S3 and the credentials in Secrets Manager, read by the
-function role — not injected as environment variables. `reserved_concurrency`
+The corpus lives in S3 and the credentials in Secrets Manager, to be read by
+the function role (F3) — not injected as environment variables. `reserved_concurrency`
 caps how much a reachable URL can spend.
 
 Streamlit is not deployed: it needs a long-lived websocket server, which a
@@ -65,6 +69,10 @@ Function URL does not provide. It runs locally against the deployed API.
 
 The chat model is Ollama's HTTP API, reachable from the function over the
 internet; embeddings come from the same endpoint, so the image carries no
-model weights. If a corpus outgrows an embedded index, `VECTOR_BACKEND`
-switches the retriever to Qdrant, Pinecone or OpenSearch without touching the
-chain.
+model weights.
+
+The deployed vector store is Pinecone serverless: free at portfolio scale and
+no idle bill, where OpenSearch Serverless would bill compute around the clock.
+The embedded `local` index serves development and tests only, since Lambda's
+filesystem is read-only and the image ships no index. `VECTOR_BACKEND` swaps
+the retriever without touching the chain.
