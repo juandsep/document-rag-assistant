@@ -45,7 +45,7 @@ query ──▶ POST /query ──▶ retriever (top-k) ──▶ LLM ──▶ 
 | Monitoring | MLflow (chain traces + retriever evaluation) |
 | UI | Streamlit (Gradio as an alternative) |
 | Deployment | AWS Lambda (container image) + Function URL, image in ECR, corpus in S3 |
-| Secrets | AWS Secrets Manager (OIDC federated auth in CI) |
+| Secrets | SSM Parameter Store SecureString (OIDC federated auth in CI) |
 | Observability | CloudWatch Logs and metrics |
 | Environment | **uv** (`pyproject.toml` + `uv.lock`) |
 | Tests & lint | pytest · ruff |
@@ -114,7 +114,7 @@ uv run streamlit run src/rag/ui.py
 | `MLFLOW_TRACKING_URI` | tracking backend |
 | `OLLAMA_BASE_URL` / `OLLAMA_MODEL` | Ollama endpoint and generation model |
 | `EMBEDDING_MODEL` | embedding model served by the same Ollama endpoint |
-| `APP_SECRET_ARN` | secret the function will read its keys from on Lambda (not read yet, see F3); local runs use `OLLAMA_API_KEY` |
+| `APP_SECRET_PARAMETER` | SecureString the function will read its keys from on Lambda (not read yet, see F3); local runs use `OLLAMA_API_KEY` |
 | `RAG_API_URL` | API base URL consumed by the UI |
 
 ## Deployment

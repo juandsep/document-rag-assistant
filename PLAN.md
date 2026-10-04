@@ -11,7 +11,7 @@ Each phase is one short-lived branch cut from `dev`, one pull request, one conce
 - [x] **F0 · Foundations** — git repo, uv project, lockfile, pytest, base CI.
 - [~] **F1 · Ingestion** — `ingest.py`: sliding-window chunking is in and tested. Multi-format loading, metadata and deduplication are not.
 - [~] **F2 · Vector store** — `retrievers.py`: adapters (`upsert`/`query`) selected by `VECTOR_BACKEND`. The embedded `local` backend is in and tested: Ollama embeddings, one versioned JSON file per upsert under `LOCAL_INDEX_DIR`, cosine search over the newest version, and `scripts/index_docs.py` writes through it. Not yet: the Pinecone adapter (the deployed backend) and the OpenSearch adapter, which both still raise `NotImplementedError`.
-- [ ] **F3 · RAG chain** — retriever + prompt + LLM; answers carry citations back to the source chunks. The model has to say the context is insufficient rather than improvise. The function also starts reading its keys from the secret named by `APP_SECRET_ARN`; today nothing in `src/` reads it.
+- [ ] **F3 · RAG chain** — retriever + prompt + LLM; answers carry citations back to the source chunks. The model has to say the context is insufficient rather than improvise. The function also starts reading its keys from the SecureString named by `APP_SECRET_PARAMETER`; today nothing in `src/` reads it.
 - [~] **F4 · API** — the FastAPI app with `POST /query`, `GET /health` and the Pydantic models is in. `/query` still returns the stub answer until F3 lands.
 - [ ] **F5 · Monitoring** — `monitoring.py`: MLflow traces (top-k, latency, relevance, token usage) plus offline retriever evaluation.
 - [~] **F6 · UI** — `ui.py` calls `POST /query` and renders a sources panel. It has no tests and it is not deployed: a Function URL carries no websockets, so the UI runs locally against the deployed API.
@@ -19,7 +19,7 @@ Each phase is one short-lived branch cut from `dev`, one pull request, one conce
 
 ## Decisions
 
-- **Cost first.** Idle cost stays near $0. AWS runs only what has to live there: the Lambda, its Function URL, ECR, the S3 corpus, the secret and the log group. Anything a third party hosts on a free tier without hurting latency or reliability stays outside AWS.
+- **Cost first.** Idle cost stays near $0. AWS runs only what has to live there: the Lambda, its Function URL, ECR, the S3 corpus, one SSM SecureString (free, unlike Secrets Manager) and the log group. Anything a third party hosts on a free tier without hurting latency or reliability stays outside AWS.
 - **Vector store: Pinecone serverless** for the deployed service (free Starter plan, no idle cost). The embedded `local` index is for development and tests only: Lambda's filesystem is read-only and the image ships no index. OpenSearch stays an adapter behind the same seam and is not deployed, because OpenSearch Serverless bills OCUs while idle.
 - **No OpenAI client and no provider zoo.** Generation and embeddings go through one HTTP endpoint; no `sentence-transformers`, so the image stays free of torch.
 - **Lazy clients.** Vector-store, LLM, S3 and MLflow clients are built on first use; tests and the Docker build stay green with no environment variables set.

@@ -48,7 +48,7 @@ both `dev` and `main`.
 
 Credentials live in the environment, never in the repository. Settings are read
 from environment variables (see the README table); `.env` is git-ignored for
-local development. Workloads read secrets from AWS Secrets Manager, and CI
+local development. Workloads read secrets from an SSM Parameter Store SecureString, and CI
 authenticates through OIDC federated credentials — no long-lived cloud keys.
 
 If a real secret ever reaches a commit, treat it as compromised: rotate it

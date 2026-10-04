@@ -8,8 +8,8 @@ Terraform (`aws` `~> 6.0`) provisioning the resources the service needs:
 | Lambda Function URL | HTTPS entry point with no load balancer and no domain of your own |
 | Amazon ECR | image registry CI pushes to |
 | Amazon S3 | document corpus (versioned, encrypted, public access blocked) |
-| AWS Secrets Manager | Ollama token, vector store key and MLflow URI |
-| IAM roles | function role (corpus read + own secret read) and deploy role (GitHub Actions through OIDC, no stored access keys) |
+| SSM Parameter Store (SecureString) | Ollama token, vector store key and MLflow URI |
+| IAM roles | function role (corpus read + own parameter read) and deploy role (GitHub Actions through OIDC, no stored access keys) |
 | CloudWatch Logs | one log group, 14-day retention |
 | AWS Budgets | monthly alarm, so a surprise is noticed |
 
@@ -23,7 +23,7 @@ nothing has to be paid for while idle.
 infra/
 ├─ main.tf                    # provider, variables, ECR, log group, budget, OIDC trust and deploy role
 ├─ lambda.tf                  # function, Function URL and its IAM role
-├─ storage.tf                 # corpus bucket and the application secret
+├─ storage.tf                 # corpus bucket and the application SecureString
 ├─ outputs.tf                 # Function URL, function name, ECR URL, deploy role ARN
 ├─ terraform.tfvars.example   # copy to terraform.tfvars and fill in
 └─ .terraform.lock.hcl        # pinned provider checksums, committed on purpose
@@ -54,9 +54,9 @@ Idle, in `us-east-1`:
 | Function URL | $0 |
 | ECR (~0.5 GB image) | ~$0.05 |
 | S3 corpus | ~$0.02 |
-| Secrets Manager | $0.40 |
+| SSM Parameter Store (standard tier) | $0 |
 | CloudWatch Logs | pennies at demo volume |
-| **Total** | **~$0.50** |
+| **Total** | **~$0.10** |
 
 The free tier absorbs ~130,000 queries a month before Lambda bills anything.
 `reserved_concurrency` is the guard that matters: it caps what a reachable URL
@@ -77,17 +77,18 @@ can spend even if someone finds it.
    AWS allows one per account: if it already exists, set
    `create_github_oidc_provider = false` or apply fails with
    `EntityAlreadyExists`.
-5. The secret is created with `REPLACE_ME` placeholders. Replace the value
-   after apply, so real credentials never sit in a `.tfvars`:
+5. The SecureString is created with `REPLACE_ME` placeholders. Replace the
+   value after apply, so real credentials never sit in a `.tfvars`; Terraform
+   ignores later changes to it:
 
    ```bash
-   aws secretsmanager put-secret-value --secret-id <app_secret_arn> \
-     --secret-string file://secret.json
+   aws ssm put-parameter --name "$(terraform output -raw app_secret_parameter)" \
+     --type SecureString --value file://secret.json --overwrite
    ```
 
    Leave `OLLAMA_API_KEY` as `""` when the endpoint needs no token. The app
-   reads the secret through `APP_SECRET_ARN`, which is already in the function's
-   environment.
+   will read the parameter through `APP_SECRET_PARAMETER`, which is already in
+   the function's environment.
 6. Take `deploy_role_arn` from the outputs and set it as the
    `AWS_DEPLOY_ROLE` repository variable for the deploy workflow.
 7. `image_tag` must exist in ECR before the function can start: `bootstrap` is
@@ -107,7 +108,7 @@ curl --aws-sigv4 "aws:amz:us-east-1:lambda" \
 - The vector store lives outside AWS: Pinecone serverless (`vector_backend`
   defaults to `pinecone`). Only its key and the backend name reach the
   function. `local` is for development; the image ships no index.
-- No credential is committed: the secret body lives in Secrets Manager and in
+- No credential is committed: the secret body lives in Parameter Store and in
   the local, git-ignored state.
 - The image is the same one that runs locally: the Lambda Web Adapter adds an
   HTTP surface on Lambda and stays inert under `docker run`.

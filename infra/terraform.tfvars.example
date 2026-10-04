@@ -25,8 +25,8 @@ alert_email = "you@example.com"
 
 # Placeholders: replace the value after apply, so real credentials never reach
 # a .tfvars file. Leave OLLAMA_API_KEY as "" when the endpoint needs no token.
-#   aws secretsmanager put-secret-value --secret-id <app_secret_arn> \
-#     --secret-string file://secret.json
+#   aws ssm put-parameter --name <app_secret_parameter> --type SecureString \
+#     --value file://secret.json --overwrite
 # rag_secret_json = <<-JSON
 #   {
 #     "PINECONE_API_KEY": "...",
