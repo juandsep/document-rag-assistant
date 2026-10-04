@@ -8,7 +8,7 @@ Each phase is one short-lived branch cut from `dev`, one pull request, one conce
 
 - [x] **F0 · Foundations** — git repo, uv project, lockfile, pytest, base CI.
 - [~] **F1 · Ingestion** — `ingest.py`: sliding-window chunking is in and tested. Multi-format loading, metadata and deduplication are not.
-- [ ] **F2 · Vector store** — `retrievers.py`: real adapters (`upsert`/`query`) selected by `VECTOR_BACKEND`. The embedded `local` backend comes first because it is what the deployment uses; Pinecone and OpenSearch follow behind the same seam.
+- [~] **F2 · Vector store** — `retrievers.py`: adapters (`upsert`/`query`) selected by `VECTOR_BACKEND`. The embedded `local` backend is in and tested: Ollama embeddings, one versioned JSON file per upsert under `LOCAL_INDEX_DIR`, cosine search over the newest version, and `scripts/index_docs.py` writes through it. Not yet: shipping the built index in the image, and the Pinecone and OpenSearch adapters, which still raise `NotImplementedError`.
 - [ ] **F3 · RAG chain** — retriever + prompt + LLM; answers carry citations back to the source chunks. The LLM is an Ollama endpoint (`OLLAMA_BASE_URL`), and the model has to say the context is insufficient rather than improvise.
 - [~] **F4 · API** — the FastAPI app with `POST /query`, `GET /health` and the Pydantic models is in. `/query` still returns the stub answer until F3 lands.
 - [ ] **F5 · Monitoring** — `monitoring.py`: MLflow traces (top-k, latency, relevance, token usage) plus offline retriever evaluation.

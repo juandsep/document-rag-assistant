@@ -39,8 +39,8 @@ query ──▶ POST /query ──▶ retriever (top-k) ──▶ LLM ──▶ 
 | Layer | Technology |
 |---|---|
 | API | FastAPI + Uvicorn |
-| Vector DB | Pinecone **or** OpenSearch (selected by `VECTOR_BACKEND`) |
-| Ingestion | chunking plus embeddings (`sentence-transformers` / provider) |
+| Vector DB | embedded `local` index by default; Pinecone **or** OpenSearch behind the same seam (`VECTOR_BACKEND`) |
+| Ingestion | sliding-window chunking plus embeddings from the Ollama endpoint |
 | Generation | Ollama HTTP API (generation + embeddings), token from the secret |
 | Monitoring | MLflow (chain traces + retriever evaluation) |
 | UI | Streamlit (Gradio as an alternative) |
@@ -55,9 +55,9 @@ query ──▶ POST /query ──▶ retriever (top-k) ──▶ LLM ──▶ 
 Roadmap in [`PLAN.md`](./PLAN.md).
 
 - [x] **F0** · Foundations: repo, uv project, lockfile, tests, base CI
-- [x] Working chunking (`ingest.chunk_text`) and Pinecone/OpenSearch adapters (skeleton)
+- [x] Working chunking (`ingest.chunk_text`)
 - [ ] **F1** · Ingestion: multi-format loading, metadata, deduplication
-- [ ] **F2** · Vector store: real upsert and query (Pinecone + OpenSearch)
+- [~] **F2** · Vector store: embedded `local` backend done; Pinecone and OpenSearch still stubs
 - [ ] **F3** · RAG chain: retriever → prompt → LLM → answer with sources
 - [ ] **F4** · API: `POST /query`, `GET /health`, Pydantic validation
 - [ ] **F5** · MLflow monitoring and offline retriever evaluation
@@ -72,7 +72,7 @@ document-rag-assistant/
 │   ├─ __init__.py     # package entry point
 │   ├─ api.py          # FastAPI app: /query, /health
 │   ├─ ingest.py       # loading, cleaning and chunking
-│   ├─ retrievers.py   # Pinecone / OpenSearch adapters
+│   ├─ retrievers.py   # local / Pinecone / OpenSearch adapters
 │   ├─ monitoring.py   # MLflow traces of the retrieval chain
 │   └─ ui.py           # Streamlit interface
 ├─ tests/
@@ -116,7 +116,8 @@ uv run streamlit run src/rag/ui.py
 
 | Variable | Description |
 |---|---|
-| `VECTOR_BACKEND` | `pinecone` \| `opensearch` |
+| `VECTOR_BACKEND` | `local` (default) \| `pinecone` \| `opensearch` |
+| `LOCAL_INDEX_DIR` | directory of the `local` index versions (default `index/`) |
 | `PINECONE_API_KEY` / `PINECONE_INDEX` | Pinecone credentials |
 | `OPENSEARCH_HOST` / `OPENSEARCH_INDEX` | OpenSearch endpoint |
 | `MLFLOW_TRACKING_URI` | tracking backend |
