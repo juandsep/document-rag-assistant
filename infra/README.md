@@ -11,6 +11,7 @@ Terraform (`aws` `~> 6.0`) provisioning the resources the service needs:
 | SSM Parameter Store (SecureString) | Ollama token, vector store key and MLflow URI |
 | IAM roles | function role (corpus read + own parameter read) and deploy role (GitHub Actions through OIDC, no stored access keys) |
 | CloudWatch Logs | one log group, 14-day retention |
+| CloudWatch alarms + SNS | errors, throttles and p95 latency, mailed to `alert_email` |
 | AWS Budgets | monthly alarm, so a surprise is noticed |
 
 There is deliberately **no ALB, no ECS cluster and no VPC**: the Function URL is
@@ -24,6 +25,7 @@ infra/
 ├─ main.tf                    # provider, variables, ECR, log group, budget, OIDC trust and deploy role
 ├─ lambda.tf                  # function, Function URL and its IAM role
 ├─ storage.tf                 # corpus bucket and the application SecureString
+├─ monitoring.tf              # CloudWatch alarms and their SNS email topic
 ├─ outputs.tf                 # Function URL, function name, ECR URL, deploy role ARN
 ├─ terraform.tfvars.example   # copy to terraform.tfvars and fill in
 └─ .terraform.lock.hcl        # pinned provider checksums, committed on purpose
@@ -56,6 +58,7 @@ Idle, in `us-east-1`:
 | S3 corpus | ~$0.02 |
 | SSM Parameter Store (standard tier) | $0 |
 | CloudWatch Logs | pennies at demo volume |
+| CloudWatch alarms (3) + SNS email | $0 (first 10 alarms and 1,000 emails are free) |
 | **Total** | **~$0.10** |
 
 The free tier absorbs ~130,000 queries a month before Lambda bills anything.
@@ -64,7 +67,9 @@ can spend even if someone finds it.
 
 ## Before the first apply
 
-1. `alert_email` has no default — it must come from `terraform.tfvars`.
+1. `alert_email` has no default — it must come from `terraform.tfvars`. AWS
+   mails a confirmation link for the alarm topic; alarms reach nobody until it
+   is clicked.
 2. `ollama_base_url` defaults to `http://localhost:11434`, which is only right
    for a local run: Lambda cannot reach a laptop. It has to point at an endpoint
    reachable from the internet, and that endpoint should require a token

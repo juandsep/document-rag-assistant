@@ -42,6 +42,7 @@ the evaluation runs. The Streamlit UI runs locally against the deployed API.
 | [PLAN.md](PLAN.md) | Phases, decisions and what blocks the first deploy |
 | [docs/architecture.md](docs/architecture.md) | Request path, indexing, evaluation, failure behaviour |
 | [infra/README.md](infra/README.md) | Terraform, costs, configuration, first apply |
+| [monitoring/README.md](monitoring/README.md) | CloudWatch alarms and the local Grafana |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Branch flow, commits, local checks |
 
 ## Run locally
