@@ -69,21 +69,15 @@ variable "qdrant_url" {
 }
 
 variable "ollama_base_url" {
-  description = "Ollama HTTP API the chain calls. Must be reachable from Lambda: the localhost default only works for a local run."
+  description = "Ollama HTTP API the chain calls: Ollama Cloud by default. Its key goes in the SecureString as OLLAMA_API_KEY."
   type        = string
-  default     = "http://localhost:11434"
+  default     = "https://ollama.com"
 }
 
 variable "ollama_model" {
-  description = "Model the chain generates with."
+  description = "Model the chain generates with. deepseek-v4.1-flash, on the same API, is the fallback if this one is too slow."
   type        = string
-  default     = "llama3.1:8b"
-}
-
-variable "embedding_model" {
-  description = "Embedding model served by the same Ollama API, used at index time and at query time."
-  type        = string
-  default     = "nomic-embed-text"
+  default     = "gpt-oss:20b"
 }
 
 variable "lambda_memory_mb" {
@@ -184,7 +178,6 @@ locals {
     QDRANT_URL           = var.qdrant_url
     OLLAMA_BASE_URL      = var.ollama_base_url
     OLLAMA_MODEL         = var.ollama_model
-    EMBEDDING_MODEL      = var.embedding_model
     APP_SECRET_PARAMETER = aws_ssm_parameter.app.name
 
     # The adapter in docker/Dockerfile forwards to the port the image listens on.

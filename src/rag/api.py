@@ -2,10 +2,52 @@
 
 from __future__ import annotations
 
-from fastapi import FastAPI
+import functools
+import json
+import os
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+from typing import Any
+
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
-app = FastAPI(title="Document RAG Assistant", version="0.1.0")
+from rag import chain
+from rag.retrievers import Retriever, get_retriever
+
+
+def load_secrets(ssm: Any = None) -> None:
+    """Copy the keys of the `APP_SECRET_PARAMETER` SecureString into the env.
+
+    Only on Lambda, where the variable is set; local runs read `.env`. Values
+    already in the environment and unfilled placeholders are left alone.
+    """
+    name = os.getenv("APP_SECRET_PARAMETER")
+    if not name:
+        return
+    if ssm is None:
+        import boto3
+
+        ssm = boto3.client("ssm")
+    value = ssm.get_parameter(Name=name, WithDecryption=True)["Parameter"]["Value"]
+    for key, secret in json.loads(value).items():
+        if secret and secret != "REPLACE_ME":
+            os.environ.setdefault(key, secret)
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    load_secrets()
+    yield
+
+
+@functools.cache
+def _retriever() -> Retriever:
+    # One client per process, reused across requests.
+    return get_retriever()
+
+
+app = FastAPI(title="Document RAG Assistant", version="0.1.0", lifespan=lifespan)
 
 
 class QueryRequest(BaseModel):
@@ -28,6 +70,10 @@ class QueryResponse(BaseModel):
 
     answer: str
     sources: list[Source] = []
+    status: str = Field(
+        default="ok",
+        description="ok | insufficient_context | llm_unavailable",
+    )
 
 
 @app.get("/health")
@@ -37,11 +83,26 @@ async def health() -> dict[str, str]:
 
 
 @app.post("/query", response_model=QueryResponse)
-async def query(payload: QueryRequest) -> QueryResponse:
+def query(payload: QueryRequest) -> QueryResponse:
     """Answer `payload.q` from the indexed corpus, citing the sources.
 
-    Placeholder: the retrieval chain lands in phase F3.
+    A sync handler on purpose: retrieval and generation block on HTTP, so
+    FastAPI runs it in its threadpool instead of stalling the event loop.
     """
-    # TODO: retriever.get_retriever().query(payload.q, top_k=payload.top_k)
-    #       -> prompt -> LLM -> QueryResponse(answer=..., sources=...)
-    return QueryResponse(answer="This is a stub response.", sources=[])
+    try:
+        result = chain.answer(
+            payload.q,
+            top_k=payload.top_k,
+            retriever=_retriever(),
+            chat=chain.ollama_chat,
+        )
+    except chain.RetrievalError as exc:
+        # Answering without retrieval would produce uncited claims.
+        raise HTTPException(503, "The vector store is unavailable.") from exc
+    return QueryResponse(
+        answer=result.text,
+        sources=[
+            Source(doc_id=s.doc_id, text=s.text, score=s.score) for s in result.sources
+        ],
+        status=result.status,
+    )

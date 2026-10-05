@@ -8,6 +8,7 @@ authors = [
 ]
 requires-python = ">=3.11"
 dependencies = [
+    "boto3>=1.43.108",
     "fastapi>=0.142.0",
     "qdrant-client>=1.19.1",
     "uvicorn>=0.54.0",

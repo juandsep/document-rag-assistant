@@ -13,9 +13,9 @@ from them, and returns them as sources. Every change to chunking, embeddings or
 the retriever is measured with precision@k / recall@k instead of guessed. It
 runs on AWS for about $0.10/month idle, plus LLM tokens.
 
-> **Work in progress.** Chunking and the local index work; the RAG chain does
-> not yet, so `/query` returns a stub answer. Status, decisions and blockers:
-> [PLAN.md](PLAN.md).
+> **Work in progress.** Retrieval and the cited-answer chain work locally
+> against Qdrant Cloud and Ollama Cloud; nothing is deployed to AWS yet.
+> Status, decisions and blockers: [PLAN.md](PLAN.md).
 
 ## How it works
 
