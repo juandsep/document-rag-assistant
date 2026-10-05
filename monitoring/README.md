@@ -2,8 +2,10 @@
 
 Monitoring lives in **CloudWatch** and is always on: Lambda's built-in metrics
 (free), the billing metric and three alarms mailed to `alert_email` (all in
-[`infra/monitoring.tf`](../infra/monitoring.tf)). This folder adds a **local
-Grafana** to explore them. It only reads, so stopping it changes nothing: the
+[`infra/monitoring.tf`](../infra/monitoring.tf)). This folder holds the
+dashboard; the portfolio's shared **local Grafana** in
+[`portfolio-infra`](https://github.com/juandsep/portfolio-infra) shows it next
+to the other projects. It only reads, so stopping it changes nothing: the
 API keeps serving, the metrics keep being collected, and the alarms keep
 firing.
 
@@ -24,18 +26,22 @@ query and the dashboard will read it with Logs Insights.
 
 ## Run Grafana
 
-Requires Docker and an AWS profile that can read CloudWatch
+Grafana runs from the sibling `portfolio-infra` checkout, with every project's
+dashboards in one place; this one is in the `document-rag-assistant` folder.
+It needs Docker and an AWS profile that can read CloudWatch
 (`CloudWatchReadOnlyAccess` is enough). Billing metrics stay empty until
 "Receive CloudWatch billing alerts" is turned on once in the Billing console.
 
 ```bash
 aws sso login --profile <profile>                 # if the profile uses SSO
-AWS_PROFILE=<profile> docker compose -f monitoring/docker-compose.yml up -d
+cd ../portfolio-infra
+AWS_PROFILE=<profile> docker compose -f grafana/docker-compose.yml up -d
 open http://localhost:3000                        # dashboard "Document RAG · API on Lambda"
-docker compose -f monitoring/docker-compose.yml down
+docker compose -f grafana/docker-compose.yml down
 ```
 
-`~/.aws` is mounted read-only; no key is copied into this folder. The
-**Function** selector switches between staging and production. The dashboard
-is code ([`grafana/dashboards/rag.json`](grafana/dashboards/rag.json)): edit it
-there, not only in the UI.
+`~/.aws` is mounted read-only; no key is copied anywhere. The **Function**
+selector switches between staging and production. The dashboard is code
+([`grafana/dashboards/rag.json`](grafana/dashboards/rag.json)), mounted
+read-only by Grafana: edit it here, not only in the UI. Its datasource uid is
+`cloudwatch`, which `portfolio-infra` provisions.

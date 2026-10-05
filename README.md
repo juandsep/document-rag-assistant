@@ -24,15 +24,15 @@ documents ──▶ chunk ──▶ Qdrant Cloud (embeds and stores)
                               │
 POST /query ──▶ top-k passages ──▶ LLM (Ollama Cloud) ──▶ answer + sources
       │
-      ├──▶ CloudWatch (logs, metrics, spend) ──▶ local Grafana
+      ├──▶ CloudWatch (logs, metrics, spend) ──▶ shared local Grafana
       └──▶ MLflow (evaluation runs, precision@k / recall@k)
 ```
 
 One Lambda function serves the FastAPI app through a Function URL: no load
 balancer, no VPC, nothing billed while idle. Qdrant Cloud embeds and indexes the
 chunks on its free tier with a multilingual model. The LLM is Ollama
-Cloud. Credentials sit in an SSM SecureString. A local Grafana reads
-CloudWatch for latency, errors and spend; the portfolio's shared MLflow keeps
+Cloud. Credentials sit in an SSM SecureString. The portfolio's shared local Grafana
+(`portfolio-infra`) reads CloudWatch for latency, errors and spend; the portfolio's shared MLflow keeps
 the evaluation runs. The Streamlit UI runs locally against the deployed API.
 
 ## Documentation
@@ -42,7 +42,7 @@ the evaluation runs. The Streamlit UI runs locally against the deployed API.
 | [PLAN.md](PLAN.md) | Phases, decisions and what blocks the first deploy |
 | [docs/architecture.md](docs/architecture.md) | Request path, indexing, evaluation, failure behaviour |
 | [infra/README.md](infra/README.md) | Terraform, costs, configuration, first apply |
-| [monitoring/README.md](monitoring/README.md) | CloudWatch alarms and the local Grafana |
+| [monitoring/README.md](monitoring/README.md) | CloudWatch alarms and the dashboard |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Branch flow, commits, local checks |
 
 ## Run locally
