@@ -54,7 +54,7 @@ Idle, in `us-east-1`:
 |---|---|
 | Lambda | $0 within the free tier (1M requests + 400k GB-s; a 3 s query at 1 GB is 3 GB-s) |
 | Function URL | $0 |
-| ECR (~0.5 GB image) | ~$0.05 |
+| ECR (~0.4 GB image) | ~$0.04 |
 | S3 corpus | ~$0.02 |
 | SSM Parameter Store (standard tier) | $0 |
 | CloudWatch Logs | pennies at demo volume |
