@@ -39,3 +39,8 @@ docker compose -f monitoring/docker-compose.yml down
 **Function** selector switches between staging and production. The dashboard
 is code ([`grafana/dashboards/rag.json`](grafana/dashboards/rag.json)): edit it
 there, not only in the UI.
+
+The same dashboard also appears in the portfolio's shared Grafana
+([`portfolio-infra/grafana`](https://github.com/juandsep/portfolio-infra), on
+port 3030), next to the other projects. That one reads this JSON from here, so
+there is still one copy to edit.
