@@ -24,7 +24,7 @@ output "deploy_role_arn" {
   value       = aws_iam_role.deploy.arn
 }
 
-output "app_secret_arn" {
-  description = "Secret to fill with `aws secretsmanager put-secret-value` before the first deploy."
-  value       = aws_secretsmanager_secret.app.arn
+output "app_secret_parameter" {
+  description = "SecureString parameter to fill with `aws ssm put-parameter --overwrite` before the first deploy."
+  value       = aws_ssm_parameter.app.name
 }

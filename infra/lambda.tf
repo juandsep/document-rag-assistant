@@ -69,8 +69,8 @@ resource "aws_iam_role_policy" "function" {
       },
       {
         Effect   = "Allow"
-        Action   = ["secretsmanager:GetSecretValue"]
-        Resource = [aws_secretsmanager_secret.app.arn]
+        Action   = ["ssm:GetParameter"]
+        Resource = [aws_ssm_parameter.app.arn]
       },
     ]
   })

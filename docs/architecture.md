@@ -60,7 +60,7 @@ HTTPS and a public hostname with no load balancer, and no bill while nobody
 asks anything. The image is built from `docker/Dockerfile` and pushed to ECR;
 the Lambda Web Adapter inside it serves the same FastAPI app that runs locally.
 
-The corpus lives in S3 and the credentials in Secrets Manager, to be read by
+The corpus lives in S3 and the credentials in an SSM SecureString, to be read by
 the function role (F3) — not injected as environment variables. `reserved_concurrency`
 caps how much a reachable URL can spend.
 

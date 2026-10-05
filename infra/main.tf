@@ -155,7 +155,7 @@ variable "create_github_oidc_provider" {
 }
 
 variable "rag_secret_json" {
-  description = "JSON body of the application secret. Placeholders by default: replace the value with `aws secretsmanager put-secret-value` after apply, so the real credentials never sit in a .tfvars file."
+  description = "JSON body of the application secret. Placeholders by default: replace the value with `aws ssm put-parameter --overwrite` after apply, so the real credentials never sit in a .tfvars file."
   type        = string
   sensitive   = true
   default     = <<-JSON
@@ -169,16 +169,16 @@ variable "rag_secret_json" {
 
 locals {
   name_prefix = "${var.project}-${var.environment}"
-  secret_arn  = aws_secretsmanager_secret.app.arn
 
   # Plain configuration the function reads at import. Nothing here is a
-  # credential: keys are read from the secret named by APP_SECRET_ARN.
+  # credential: keys are read from the SecureString named by
+  # APP_SECRET_PARAMETER.
   function_env = {
-    VECTOR_BACKEND  = var.vector_backend
-    OLLAMA_BASE_URL = var.ollama_base_url
-    OLLAMA_MODEL    = var.ollama_model
-    EMBEDDING_MODEL = var.embedding_model
-    APP_SECRET_ARN  = local.secret_arn
+    VECTOR_BACKEND       = var.vector_backend
+    OLLAMA_BASE_URL      = var.ollama_base_url
+    OLLAMA_MODEL         = var.ollama_model
+    EMBEDDING_MODEL      = var.embedding_model
+    APP_SECRET_PARAMETER = aws_ssm_parameter.app.name
 
     # The adapter in docker/Dockerfile forwards to the port the image listens on.
     AWS_LWA_PORT                    = "8000"
