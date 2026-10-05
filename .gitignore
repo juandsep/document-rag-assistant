@@ -33,3 +33,9 @@ infra/tfplan
 .DS_Store
 .idea/
 .vscode/
+
+# Local vector index (built by scripts/index_docs.py)
+index/
+
+# graphify knowledge graph (regenerate with /graphify . --update)
+graphify-out/

@@ -1,143 +1,72 @@
 # Document RAG Assistant
 
-> Answers **business questions** over a document corpus: retrieves the relevant passages from a **vector database**, generates an answer **citing its sources**, and **traces the whole retrieval chain in MLflow**.
+Answers business questions over a document corpus, citing the passages each
+answer comes from.
 
 [![CI](https://github.com/juandsep/document-rag-assistant/actions/workflows/ci.yml/badge.svg)](https://github.com/juandsep/document-rag-assistant/actions/workflows/ci.yml)
 ![Python](https://img.shields.io/badge/python-3.11-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
----
+An LLM answering from memory hallucinates, and nobody can tell which claim came
+from where. This service retrieves the relevant passages first, answers only
+from them, and returns them as sources. Every change to chunking, embeddings or
+the retriever is measured with precision@k / recall@k instead of guessed. It
+runs on AWS for about $0.10/month idle, plus LLM tokens.
 
-## The problem
+> **Work in progress.** Chunking and the local index work; the RAG chain does
+> not yet, so `/query` returns a stub answer. Status, decisions and blockers:
+> [PLAN.md](PLAN.md).
 
-Business knowledge is scattered across PDFs, wikis, contracts and tickets. Searching that corpus is slow, and an LLM answering without context **hallucinates**: there is no way to tell where a claim came from, nor to measure whether retrieval is improving or degrading.
-
-## The approach
-
-A **RAG** pipeline that splits the problem in two and makes each half measurable:
-
-1. **Retrieval** — documents are chunked, embedded and indexed in a **vector database** (Pinecone or OpenSearch). Each query pulls the top-k most similar passages.
-2. **Generation** — the LLM answers **only from the retrieved context** and returns the **sources** behind every claim.
-3. **Monitoring** — every query leaves a trace in **MLflow**: retrieved top-k, similarity scores, latency and token usage. An **offline evaluation** (precision@k / recall@k) runs on top of that, so a change to the retriever, the chunking or the embedding model is measured instead of guessed.
-
-## Architecture
+## How it works
 
 ```
-documents ──▶ ingest + chunking ──▶ embeddings ──▶ Vector DB (Pinecone / OpenSearch)
-                                                        │
-query ──▶ POST /query ──▶ retriever (top-k) ──▶ LLM ──▶ answer + cited sources
-              │                │
-              └──── traces ────┴──▶ MLflow (top-k, scores, latency, tokens)
-                                       │
-                                       └──▶ offline evaluation (precision@k / recall@k)
-                                                        │
-                                 Streamlit UI ◀─────────┘
+documents ──▶ chunk ──▶ Qdrant Cloud (embeds and stores)
+                              │
+POST /query ──▶ top-k passages ──▶ LLM (Ollama Cloud) ──▶ answer + sources
+      │
+      ├──▶ CloudWatch (logs, metrics, spend) ──▶ local Grafana
+      └──▶ MLflow (evaluation runs, precision@k / recall@k)
 ```
 
-## Stack
+One Lambda function serves the FastAPI app through a Function URL: no load
+balancer, no VPC, nothing billed while idle. Qdrant Cloud embeds and indexes the
+chunks on its free tier with a multilingual model. The LLM is Ollama
+Cloud. Credentials sit in an SSM SecureString. A local Grafana reads
+CloudWatch for latency, errors and spend; the portfolio's shared MLflow keeps
+the evaluation runs. The Streamlit UI runs locally against the deployed API.
 
-| Layer | Technology |
+## Documentation
+
+| Document | What it covers |
 |---|---|
-| API | FastAPI + Uvicorn |
-| Vector DB | Pinecone **or** OpenSearch (selected by `VECTOR_BACKEND`) |
-| Ingestion | chunking plus embeddings (`sentence-transformers` / provider) |
-| Generation | configurable LLM provider (credential via secret) |
-| Monitoring | MLflow (chain traces + retriever evaluation) |
-| UI | Streamlit (Gradio as an alternative) |
-| Deployment | AWS ECS Fargate + ALB, images in ECR, corpus in S3 |
-| Secrets | AWS Secrets Manager (OIDC federated auth in CI) |
-| Observability | CloudWatch Logs and metrics |
-| Environment | **uv** (`pyproject.toml` + `uv.lock`) |
-| Tests & lint | pytest · ruff |
+| [PLAN.md](PLAN.md) | Phases, decisions and what blocks the first deploy |
+| [docs/architecture.md](docs/architecture.md) | Request path, indexing, evaluation, failure behaviour |
+| [infra/README.md](infra/README.md) | Terraform, costs, configuration, first apply |
+| [monitoring/README.md](monitoring/README.md) | CloudWatch alarms and the local Grafana |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Branch flow, commits, local checks |
 
-## Project status
+## Run locally
 
-Roadmap in [`PLAN.md`](./PLAN.md).
-
-- [x] **F0** · Foundations: repo, uv project, lockfile, tests, base CI
-- [x] Working chunking (`ingest.chunk_text`) and Pinecone/OpenSearch adapters (skeleton)
-- [ ] **F1** · Ingestion: multi-format loading, metadata, deduplication
-- [ ] **F2** · Vector store: real upsert and query (Pinecone + OpenSearch)
-- [ ] **F3** · RAG chain: retriever → prompt → LLM → answer with sources
-- [ ] **F4** · API: `POST /query`, `GET /health`, Pydantic validation
-- [ ] **F5** · MLflow monitoring and offline retriever evaluation
-- [ ] **F6** · Streamlit UI (chat plus sources)
-- [ ] **F7** · CI/CD and AWS deployment (ECR + ECS Fargate + ALB)
-
-## Repository layout
-
-```
-document-rag-assistant/
-├─ src/rag/
-│   ├─ __init__.py     # package entry point
-│   ├─ api.py          # FastAPI app: /query, /health
-│   ├─ ingest.py       # loading, cleaning and chunking
-│   ├─ retrievers.py   # Pinecone / OpenSearch adapters
-│   ├─ monitoring.py   # MLflow traces of the retrieval chain
-│   └─ ui.py           # Streamlit interface
-├─ tests/
-│   ├─ unit/           # fast, no external services
-│   └─ integration/    # wired against fakes or containers
-├─ scripts/            # index_docs.py (indexing / reindexing)
-├─ docker/             # multi-stage Dockerfile
-├─ docs/               # architecture notes
-├─ infra/              # Terraform (aws)
-├─ .github/workflows/  # CI and deploy
-├─ PLAN.md
-└─ pyproject.toml      # dependencies managed with uv
-```
-
-## Quickstart
+Requires [uv](https://docs.astral.sh/uv/) and Python 3.11.
 
 ```bash
-git clone https://github.com/juandsep/document-rag-assistant.git
-cd document-rag-assistant
-
-uv sync                  # create .venv from uv.lock
-uv run pytest -q         # unit tests
-uv run uvicorn rag.api:app --reload   # http://localhost:8000
-```
-
-Ask a question:
-
-```bash
-curl -X POST "http://localhost:8000/query" -H "Content-Type: application/json" \
-     -d '{"q": "What is the return policy?"}'
-```
-
-Index a corpus and open the UI:
-
-```bash
-uv run python scripts/index_docs.py ./docs
+uv sync
+uv run pytest -q
+uv run ruff check . && uv run ruff format --check .
+uv run rag                                        # API on http://localhost:8000
+uv run python scripts/index_docs.py <corpus-dir>
 uv run streamlit run src/rag/ui.py
 ```
 
-## Configuration
+Configuration comes from environment variables, listed in
+[infra/README.md](infra/README.md#configuration).
 
-| Variable | Description |
-|---|---|
-| `VECTOR_BACKEND` | `pinecone` \| `opensearch` |
-| `PINECONE_API_KEY` / `PINECONE_INDEX` | Pinecone credentials |
-| `OPENSEARCH_HOST` / `OPENSEARCH_INDEX` | OpenSearch endpoint |
-| `MLFLOW_TRACKING_URI` | tracking backend |
-| `LLM_PROVIDER` / `OPENAI_API_KEY` | LLM provider and credential |
-| `RAG_API_URL` | API base URL consumed by the UI |
+**Stack:** FastAPI, Qdrant, Ollama Cloud, MLflow, Streamlit, AWS Lambda +
+Function URL, ECR, S3, SSM, CloudWatch + Grafana, uv + ruff + pytest,
+Terraform, GitHub Actions.
 
-## Deployment
+## Contributing
 
-`docker build -f docker/Dockerfile -t document-rag-assistant .` → push to **ECR** → `aws ecs update-service` (`rag-api` and `rag-ui` services behind one ALB).
-Terraform and notes in [`infra/`](./infra/README.md); pipeline in `.github/workflows/`.
-
-## Success metrics
-
-- Retriever precision@k / recall@k above the agreed threshold.
-- End-to-end p95 latency below 3 s.
-- Full traceability: every answer links back to the retrieved source documents.
-
-## Related
-
-Structure, CI and conventions follow the reference pipeline `uplift-modeling-pipeline`.
-
----
-
-**Stack:** Python 3.11 · uv · FastAPI · Pinecone/OpenSearch · MLflow · Streamlit · AWS ECS Fargate · GitHub Actions
+Changes go on a `feat/`, `fix/`, `chore/` or `docs/` branch cut from `dev` and
+merge into `dev` through a pull request; merging `dev` into `main` releases.
+See [CONTRIBUTING.md](CONTRIBUTING.md).

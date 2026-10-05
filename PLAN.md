@@ -2,24 +2,49 @@
 
 Goal: a business question-answering assistant over a document corpus, with vector retrieval, a traced retrieval chain and a UI.
 
+This file is the single source of truth for project status. The README links here instead of repeating it.
+
 Each phase is one short-lived branch cut from `dev`, one pull request, one concern.
 
 ## Phases
 
 - [x] **F0 · Foundations** — git repo, uv project, lockfile, pytest, base CI.
-- [ ] **F1 · Ingestion** — `ingest.py`: document loading, chunking, metadata, deduplication.
-- [ ] **F2 · Vector store** — `retrievers.py`: real Pinecone and OpenSearch adapters (create/upsert/query), selected by `VECTOR_BACKEND`.
-- [ ] **F3 · RAG chain** — retriever + prompt + LLM; answers carry citations back to the source chunks.
-- [ ] **F4 · API** — `api.py`: `POST /query`, `GET /health`, Pydantic request/response models.
-- [ ] **F5 · Monitoring** — `monitoring.py`: MLflow traces (top-k, latency, relevance, token usage) plus offline retriever evaluation.
-- [ ] **F6 · UI** — `ui.py`: Streamlit chat with a sources panel; Gradio as an alternative.
-- [ ] **F7 · CI/CD and deployment** — GitHub Actions (lint, test, build) → image → ECS Fargate behind an ALB.
+- [~] **F1 · Ingestion** — `ingest.py`: sliding-window chunking is in and tested. Multi-format loading, metadata and deduplication are not.
+- [x] **F2 · Vector store** — `retrievers.py`: adapters (`upsert`/`query`) selected by `VECTOR_BACKEND`; each `upsert` writes a new version and returns its name. `qdrant` (deployed): server-side embedding, one `document-rag-v<UTC timestamp>` collection per version, queries through the `document-rag` alias; the first version is promoted on its own, later ones with `promote()`. `local` (development): Ollama embeddings, one JSON file per version under `LOCAL_INDEX_DIR`, the newest serves. `scripts/index_docs.py` writes through either. `.github/workflows/keepalive.yml` queries Qdrant twice a week so the free cluster is never suspended. Tested against fakes; not yet against a live cluster.
+- [ ] **F3 · RAG chain** — retriever + prompt + LLM; answers carry citations back to the source chunks. The model has to say the context is insufficient rather than improvise. The function also starts reading its keys from the SecureString named by `APP_SECRET_PARAMETER`; today nothing in `src/` reads it.
+- [~] **F4 · API** — the FastAPI app with `POST /query`, `GET /health` and the Pydantic models is in. `/query` still returns the stub answer until F3 lands.
+- [~] **F5 · Monitoring** — done: CloudWatch alarms (`infra/monitoring.tf`) and the local Grafana under `monitoring/` with Lambda and spend panels. Not yet: one structured log line per query (latency, top-k scores, tokens, LLM cost) in CloudWatch, its Logs Insights panels, and an offline evaluation (precision@k / recall@k) logged to the shared MLflow.
+- [~] **F6 · UI** — `ui.py` calls `POST /query` and renders a sources panel. It has no tests and it is not deployed: a Function URL carries no websockets, so the UI runs locally against the deployed API.
+- [~] **F7 · CI/CD and deployment** — `ci.yml` runs the tests and builds the image. `infra/` holds the Terraform for a container-image Lambda behind a Function URL (`terraform validate` passes, nothing applied). Missing: `.github/workflows/deploy.yml`, in its own file and not bolted into `ci.yml`.
+
+## Decisions
+
+- **Cost first.** Idle cost stays near $0. AWS runs only what has to live there: the Lambda, its Function URL, ECR, the S3 corpus, one SSM SecureString (free, unlike Secrets Manager) and the log group. Anything a third party hosts on a free tier without hurting latency or reliability stays outside AWS.
+- **Vector store: Qdrant Cloud free tier** (0.5 vCPU, 1 GB RAM, 4 GB disk; about a million 768-dimension vectors, more at 384). Collection aliases switch the serving version atomically, which is exactly the promote-after-evaluation step. The free cluster is suspended after a week without requests and deleted after four, so `keepalive.yml` queries it twice a week. Pinecone was tried and dropped; OpenSearch is dropped too, since its serverless tier bills while idle. The `local` index is for development and tests only: Lambda's filesystem is read-only and the image ships no index.
+- **Embeddings: Qdrant Cloud Inference** with `intfloat/multilingual-e5-small` (384 dimensions, free on free clusters, handles Spanish and English). Qdrant embeds at upsert and at query time with the same model, so index and query can never drift apart, and no embedding host has to run anywhere. Chunks carry the `passage: ` prefix and questions the `query: ` prefix, as e5 expects.
+- **LLM: Ollama Cloud** (`OLLAMA_BASE_URL=https://ollama.com`, bearer `OLLAMA_API_KEY`). The free plan costs nothing and the code already speaks the Ollama API. Its limits are not published (one concurrent request on Free); if the evaluation shows they break the 3 s p95, switch to DeepSeek (`deepseek-flash`, about $0.0006 a query) behind the same chain function. Never both at once.
+- **No OpenAI client and no provider zoo.** No `sentence-transformers` either, so the image stays free of torch.
+- **MLflow: the shared server** from `portfolio-infra` (Cloud Run, scales to zero, Neon Postgres on the free tier). It keeps evaluation runs and index versions, logged from a laptop or CI with a Google identity token. The function does not call it per query: that would need AWS-to-GCP workload identity federation on the hot path. Per-query traces go to CloudWatch instead.
+- **Monitoring as in `telegram-personal-assistant`:** CloudWatch collects always (Lambda's built-in metrics are free, Logs Insights queries cost cents) and mails alarms; Grafana runs locally with Docker, read-only, and costs nothing when stopped. Spend comes from the `AWS/Billing` metric plus the LLM cost logged per query.
+- **Lazy clients.** Vector-store, LLM, S3 and MLflow clients are built on first use; tests and the Docker build stay green with no environment variables set.
+- **English everywhere** in the repository. `ingest.py` and `monitoring.py` still carry Spanish docstrings and messages; translate them in whichever change next touches each file.
 
 ## Success metrics
 
 - Retriever precision@k / recall@k above the agreed threshold.
 - End-to-end p95 latency below 3 s.
 - Full traceability: every answer links back to the retrieved source documents.
+
+## Blocked before the first deploy
+
+None of these can be finished by writing code alone:
+
+1. **An AWS credential method.** No identity has touched the account yet: no CLI on the development machine, no profile, and `terraform plan` fails on credentials. The first apply needs IAM Identity Center (SSO), a temporary IAM user profile, or an assumable role.
+2. **API keys.** An Ollama API key (ollama.com → Settings → Keys) and a Qdrant Cloud free cluster (its URL goes to `qdrant_url`, its key into the SecureString after the first apply; both also as the `QDRANT_URL` variable and `QDRANT_API_KEY` secret of the repository, for the keepalive).
+3. **Billing metrics.** "Receive CloudWatch billing alerts" must be turned on once in the Billing console, or `AWS/Billing` stays empty in Grafana.
+4. **A decision on who may call the API.** `function_url_auth_type` defaults to `AWS_IAM`, so a deploy stays private until someone picks `NONE` for a public demo. That default keeps a mistake from spending model time, but a browser cannot call the URL unsigned either.
+
+`infra/README.md` repeats the infrastructure items next to the commands that consume them.
 
 ## Reference
 

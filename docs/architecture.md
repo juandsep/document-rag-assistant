@@ -2,11 +2,14 @@
 
 ## Request path
 
+This page describes the target design. What already works is tracked in
+[`PLAN.md`](../PLAN.md); sections marked *(planned)* do not exist in code yet.
+
 ```
 POST /query { q }
       │
       ▼
-  embed(q) ──▶ Vector DB (Pinecone / OpenSearch) ──▶ top-k chunks
+  embed(q) ──▶ Vector DB (Qdrant / local) ──▶ top-k chunks
       │
       ▼
   prompt(chunks, q) ──▶ LLM ──▶ answer + cited sources
@@ -31,16 +34,24 @@ documents ──▶ load ──▶ chunk ──▶ embed ──▶ upsert (index
 Chunking is a sliding window (`ingest.chunk_text`) so adjacent passages overlap
 and a fact split across a boundary is still retrievable.
 
-Reindexing writes a **new** index version; the serving index is switched only
-after the evaluation passes.
+Reindexing writes a **new** index version and never overwrites an older one:
+a `document-rag-v<UTC timestamp>` collection in Qdrant, a `vN.json` file
+locally. Qdrant queries go through the `document-rag` alias. The first
+version takes the alias on its own; a later one goes live only through
+`promote()`, which moves the alias in one atomic operation, after its
+evaluation passes (the evaluation arrives with F5):
 
-## Evaluation
+```bash
+uv run python -c "from rag.retrievers import QdrantRetriever; QdrantRetriever().promote('<version>')"
+```
+
+## Evaluation *(planned)*
 
 `monitoring.py` logs per-query traces to MLflow. On top of those, an offline
 evaluation runs precision@k and recall@k over a labelled question set, which is
 what turns "the answers feel better" into a number attached to a pull request.
 
-## Failure behaviour
+## Failure behaviour *(planned)*
 
 - **Vector DB unavailable** — `/query` fails fast with `503`; answering without
   retrieval would produce uncited claims.
@@ -51,6 +62,24 @@ what turns "the answers feel better" into a number attached to a pull request.
 
 ## Deployment
 
-ECS Fargate runs two services behind one ALB: `rag-api` (FastAPI) and `rag-ui`
-(Streamlit). The corpus lives in S3; credentials come from Secrets Manager
-through the task role. The image is built from `docker/Dockerfile` and pushed to ECR.
+Lambda runs the API as a container image, reached through a Function URL:
+HTTPS and a public hostname with no load balancer, and no bill while nobody
+asks anything. The image is built from `docker/Dockerfile` and pushed to ECR;
+the Lambda Web Adapter inside it serves the same FastAPI app that runs locally.
+
+The corpus lives in S3 and the credentials in an SSM SecureString, to be read by
+the function role (F3) — not injected as environment variables. `reserved_concurrency`
+caps how much a reachable URL can spend.
+
+Streamlit is not deployed: it needs a long-lived websocket server, which a
+Function URL does not provide. It runs locally against the deployed API.
+
+The chat model is Ollama Cloud's HTTP API, reachable from the function over
+the internet. Qdrant Cloud embeds the chunks and the questions itself
+(`multilingual-e5-small`), so the image carries no model weights.
+
+The deployed vector store is Qdrant Cloud's free cluster: no idle bill, and
+kept from suspension by `.github/workflows/keepalive.yml`. The embedded
+`local` index serves development and tests only, since Lambda's filesystem is
+read-only and the image ships no index. `VECTOR_BACKEND` swaps the retriever
+without touching the chain.

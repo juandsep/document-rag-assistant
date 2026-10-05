@@ -9,10 +9,7 @@ authors = [
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.142.0",
-    "mlflow>=3.16.1",
-    "opensearch-py>=3.2.0",
-    "pinecone-client>=6.0.0",
-    "streamlit>=1.64.0",
+    "qdrant-client>=1.19.1",
     "uvicorn>=0.54.0",
 ]
 
@@ -23,12 +20,23 @@ rag = "rag:main"
 requires = ["uv_build>=0.12.18,<0.13.0"]
 build-backend = "uv_build"
 
+[tool.uv]
+# Local `uv sync` installs everything; the image installs none of these groups
+# (docker/Dockerfile), so it ships without Streamlit or MLflow.
+default-groups = ["dev", "ui", "eval"]
+
 [dependency-groups]
 dev = [
     "httpx>=0.27.0",
     "pytest>=9.1.1",
     "pytest-cov>=6.0.0",
     "ruff>=0.6.0",
+]
+eval = [
+    "mlflow>=3.16.1",
+]
+ui = [
+    "streamlit>=1.65.0",
 ]
 
 [tool.ruff]
