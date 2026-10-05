@@ -103,6 +103,24 @@ curl --aws-sigv4 "aws:amz:us-east-1:lambda" \
      -H "content-type: application/json" -d '{"q": "What is the return policy?"}'
 ```
 
+## Configuration
+
+Environment variables the app reads. Lambda gets the plain ones from
+`main.tf`; credentials come from the SecureString. Local runs read them from a
+git-ignored `.env`.
+
+| Variable | Description |
+|---|---|
+| `VECTOR_BACKEND` | `local` (code default, development) \| `pinecone` (deployed) \| `opensearch` |
+| `LOCAL_INDEX_DIR` | directory of the `local` index versions (default `index/`) |
+| `PINECONE_API_KEY` / `PINECONE_INDEX` | Pinecone credentials |
+| `OPENSEARCH_HOST` / `OPENSEARCH_INDEX` | OpenSearch endpoint |
+| `MLFLOW_TRACKING_URI` | tracking backend |
+| `OLLAMA_BASE_URL` / `OLLAMA_MODEL` / `OLLAMA_API_KEY` | Ollama endpoint, generation model and bearer token |
+| `EMBEDDING_MODEL` | embedding model the `local` backend asks Ollama for |
+| `APP_SECRET_PARAMETER` | SecureString the function will read its keys from (not read yet, see F3) |
+| `RAG_API_URL` | API base URL consumed by the UI |
+
 ## Conventions
 
 - The vector store lives outside AWS: Pinecone serverless (`vector_backend`
