@@ -9,7 +9,7 @@ This page describes the target design. What already works is tracked in
 POST /query { q }
       │
       ▼
-  embed(q) ──▶ Vector DB (Pinecone / local) ──▶ top-k chunks
+  embed(q) ──▶ Vector DB (Qdrant / local) ──▶ top-k chunks
       │
       ▼
   prompt(chunks, q) ──▶ LLM ──▶ answer + cited sources
@@ -34,9 +34,16 @@ documents ──▶ load ──▶ chunk ──▶ embed ──▶ upsert (index
 Chunking is a sliding window (`ingest.chunk_text`) so adjacent passages overlap
 and a fact split across a boundary is still retrievable.
 
-Reindexing writes a **new** index version and never overwrites an older one.
-Today the newest version serves immediately; switching only after the
-evaluation passes is planned with F5.
+Reindexing writes a **new** index version and never overwrites an older one:
+a `document-rag-v<UTC timestamp>` collection in Qdrant, a `vN.json` file
+locally. Qdrant queries go through the `document-rag` alias. The first
+version takes the alias on its own; a later one goes live only through
+`promote()`, which moves the alias in one atomic operation, after its
+evaluation passes (the evaluation arrives with F5):
+
+```bash
+uv run python -c "from rag.retrievers import QdrantRetriever; QdrantRetriever().promote('<version>')"
+```
 
 ## Evaluation *(planned)*
 
@@ -67,12 +74,12 @@ caps how much a reachable URL can spend.
 Streamlit is not deployed: it needs a long-lived websocket server, which a
 Function URL does not provide. It runs locally against the deployed API.
 
-The chat model is Ollama's HTTP API, reachable from the function over the
-internet; embeddings come from the same endpoint, so the image carries no
-model weights.
+The chat model is Ollama Cloud's HTTP API, reachable from the function over
+the internet. Qdrant Cloud embeds the chunks and the questions itself
+(`multilingual-e5-small`), so the image carries no model weights.
 
-The deployed vector store is Pinecone serverless: free at portfolio scale and
-no idle bill, where OpenSearch Serverless would bill compute around the clock.
-The embedded `local` index serves development and tests only, since Lambda's
-filesystem is read-only and the image ships no index. `VECTOR_BACKEND` swaps
-the retriever without touching the chain.
+The deployed vector store is Qdrant Cloud's free cluster: no idle bill, and
+kept from suspension by `.github/workflows/keepalive.yml`. The embedded
+`local` index serves development and tests only, since Lambda's filesystem is
+read-only and the image ships no index. `VECTOR_BACKEND` swaps the retriever
+without touching the chain.

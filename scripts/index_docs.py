@@ -25,8 +25,8 @@ def main(root: str) -> None:
         doc_chunks = chunk_text(load_document(str(path)), doc_id=path.name)
         chunks.extend(doc_chunks)
         print(f"{path.name}: {len(doc_chunks)} chunks")
-    get_retriever().upsert(chunks)
-    print(f"total chunks: {len(chunks)}")
+    version = get_retriever().upsert(chunks)
+    print(f"total chunks: {len(chunks)} -> index version {version}")
 
 
 if __name__ == "__main__":

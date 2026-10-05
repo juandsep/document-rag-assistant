@@ -52,14 +52,20 @@ variable "image_tag" {
 }
 
 variable "vector_backend" {
-  description = "Retriever the chain talks to: pinecone (deployed), local (development only, the image ships no index) or opensearch."
+  description = "Retriever the chain talks to: qdrant (deployed) or local (development only, the image ships no index)."
   type        = string
-  default     = "pinecone"
+  default     = "qdrant"
 
   validation {
-    condition     = contains(["local", "pinecone", "opensearch"], var.vector_backend)
-    error_message = "vector_backend must be local, pinecone or opensearch."
+    condition     = contains(["local", "qdrant"], var.vector_backend)
+    error_message = "vector_backend must be local or qdrant."
   }
+}
+
+variable "qdrant_url" {
+  description = "Qdrant Cloud cluster URL (https://<id>.<region>.aws.cloud.qdrant.io). Its API key goes in the SecureString, not here."
+  type        = string
+  default     = ""
 }
 
 variable "ollama_base_url" {
@@ -160,7 +166,7 @@ variable "rag_secret_json" {
   sensitive   = true
   default     = <<-JSON
     {
-      "PINECONE_API_KEY": "REPLACE_ME",
+      "QDRANT_API_KEY": "REPLACE_ME",
       "OLLAMA_API_KEY": "",
       "MLFLOW_TRACKING_URI": "REPLACE_ME"
     }
@@ -175,6 +181,7 @@ locals {
   # APP_SECRET_PARAMETER.
   function_env = {
     VECTOR_BACKEND       = var.vector_backend
+    QDRANT_URL           = var.qdrant_url
     OLLAMA_BASE_URL      = var.ollama_base_url
     OLLAMA_MODEL         = var.ollama_model
     EMBEDDING_MODEL      = var.embedding_model
