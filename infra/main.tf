@@ -126,7 +126,7 @@ variable "monthly_budget_usd" {
 }
 
 variable "alert_email" {
-  description = "Address the budget alarm writes to."
+  description = "Address the budget alarm and the CloudWatch alarms write to."
   type        = string
 }
 
