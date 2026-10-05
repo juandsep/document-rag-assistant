@@ -16,14 +16,14 @@ Business knowledge is scattered across PDFs, wikis, contracts and tickets. Searc
 
 A **RAG** pipeline that splits the problem in two and makes each half measurable:
 
-1. **Retrieval** — documents are chunked, embedded and indexed in a **vector database** (Pinecone or OpenSearch). Each query pulls the top-k most similar passages.
+1. **Retrieval** — documents are chunked, embedded and indexed in a **vector database** (Pinecone when deployed, an embedded index locally). Each query pulls the top-k most similar passages.
 2. **Generation** — the LLM answers **only from the retrieved context** and returns the **sources** behind every claim.
 3. **Monitoring** — every query leaves a trace in **MLflow**: retrieved top-k, similarity scores, latency and token usage. An **offline evaluation** (precision@k / recall@k) runs on top of that, so a change to the retriever, the chunking or the embedding model is measured instead of guessed.
 
 ## Architecture
 
 ```
-documents ──▶ ingest + chunking ──▶ embeddings ──▶ Vector DB (Pinecone / OpenSearch)
+documents ──▶ ingest + chunking ──▶ embeddings ──▶ Vector DB (Pinecone / local)
                                                         │
 query ──▶ POST /query ──▶ retriever (top-k) ──▶ LLM ──▶ answer + cited sources
               │                │
@@ -39,8 +39,8 @@ query ──▶ POST /query ──▶ retriever (top-k) ──▶ LLM ──▶ 
 | Layer | Technology |
 |---|---|
 | API | FastAPI + Uvicorn |
-| Vector DB | Pinecone **or** OpenSearch (selected by `VECTOR_BACKEND`) |
-| Ingestion | chunking plus embeddings (`sentence-transformers` / provider) |
+| Vector DB | Pinecone serverless when deployed; embedded `local` index for development; OpenSearch as an optional adapter (`VECTOR_BACKEND`) |
+| Ingestion | sliding-window chunking plus embeddings from the Ollama endpoint |
 | Generation | Ollama HTTP API (generation + embeddings), token from the secret |
 | Monitoring | MLflow (chain traces + retriever evaluation) |
 | UI | Streamlit (Gradio as an alternative) |
@@ -52,17 +52,8 @@ query ──▶ POST /query ──▶ retriever (top-k) ──▶ LLM ──▶ 
 
 ## Project status
 
-Roadmap in [`PLAN.md`](./PLAN.md).
-
-- [x] **F0** · Foundations: repo, uv project, lockfile, tests, base CI
-- [x] Working chunking (`ingest.chunk_text`) and Pinecone/OpenSearch adapters (skeleton)
-- [ ] **F1** · Ingestion: multi-format loading, metadata, deduplication
-- [ ] **F2** · Vector store: real upsert and query (Pinecone + OpenSearch)
-- [ ] **F3** · RAG chain: retriever → prompt → LLM → answer with sources
-- [ ] **F4** · API: `POST /query`, `GET /health`, Pydantic validation
-- [ ] **F5** · MLflow monitoring and offline retriever evaluation
-- [ ] **F6** · Streamlit UI (chat plus sources)
-- [ ] **F7** · CI/CD and AWS deployment (ECR + Lambda + Function URL)
+Work in progress: chunking and the local index work; the RAG chain does not yet, so `/query`
+returns a stub answer. Phase-by-phase status, decisions and blockers live in [`PLAN.md`](./PLAN.md).
 
 ## Repository layout
 
@@ -72,7 +63,7 @@ document-rag-assistant/
 │   ├─ __init__.py     # package entry point
 │   ├─ api.py          # FastAPI app: /query, /health
 │   ├─ ingest.py       # loading, cleaning and chunking
-│   ├─ retrievers.py   # Pinecone / OpenSearch adapters
+│   ├─ retrievers.py   # local / Pinecone / OpenSearch adapters
 │   ├─ monitoring.py   # MLflow traces of the retrieval chain
 │   └─ ui.py           # Streamlit interface
 ├─ tests/
@@ -98,7 +89,7 @@ uv run pytest -q         # unit tests
 uv run uvicorn rag.api:app --reload   # http://localhost:8000
 ```
 
-Ask a question:
+Ask a question (a stub answer until the RAG chain lands):
 
 ```bash
 curl -X POST "http://localhost:8000/query" -H "Content-Type: application/json" \
@@ -108,7 +99,7 @@ curl -X POST "http://localhost:8000/query" -H "Content-Type: application/json" \
 Index a corpus and open the UI:
 
 ```bash
-uv run python scripts/index_docs.py ./docs
+uv run python scripts/index_docs.py <corpus-dir>
 uv run streamlit run src/rag/ui.py
 ```
 
@@ -116,13 +107,14 @@ uv run streamlit run src/rag/ui.py
 
 | Variable | Description |
 |---|---|
-| `VECTOR_BACKEND` | `pinecone` \| `opensearch` |
+| `VECTOR_BACKEND` | `local` (code default, development) \| `pinecone` (deployed) \| `opensearch` |
+| `LOCAL_INDEX_DIR` | directory of the `local` index versions (default `index/`) |
 | `PINECONE_API_KEY` / `PINECONE_INDEX` | Pinecone credentials |
 | `OPENSEARCH_HOST` / `OPENSEARCH_INDEX` | OpenSearch endpoint |
 | `MLFLOW_TRACKING_URI` | tracking backend |
 | `OLLAMA_BASE_URL` / `OLLAMA_MODEL` | Ollama endpoint and generation model |
 | `EMBEDDING_MODEL` | embedding model served by the same Ollama endpoint |
-| `APP_SECRET_ARN` | secret the function reads its keys from (Lambda; local runs use `OLLAMA_API_KEY`) |
+| `APP_SECRET_ARN` | secret the function will read its keys from on Lambda (not read yet, see F3); local runs use `OLLAMA_API_KEY` |
 | `RAG_API_URL` | API base URL consumed by the UI |
 
 ## Deployment
@@ -148,4 +140,4 @@ Structure, CI and conventions follow the reference pipeline `uplift-modeling-pip
 
 ---
 
-**Stack:** Python 3.11 · uv · FastAPI · Ollama · Pinecone/OpenSearch · MLflow · Streamlit · AWS Lambda + Function URL · GitHub Actions
+**Stack:** Python 3.11 · uv · FastAPI · Ollama · Pinecone · MLflow · Streamlit · AWS Lambda + Function URL · GitHub Actions
