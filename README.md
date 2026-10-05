@@ -29,11 +29,12 @@ POST /query ──▶ top-k passages ──▶ LLM (Ollama Cloud) ──▶ answ
 ```
 
 One Lambda function serves the FastAPI app through a Function URL: no load
-balancer, no VPC, nothing billed while idle. Qdrant Cloud embeds and indexes the
-chunks on its free tier with a multilingual model. The LLM is Ollama
-Cloud. Credentials sit in an SSM SecureString. The portfolio's shared local Grafana
-(`portfolio-infra`) reads CloudWatch for latency, errors and spend; the portfolio's shared MLflow keeps
-the evaluation runs. The Streamlit UI runs locally against the deployed API.
+balancer, no VPC, nothing billed while idle. Qdrant Cloud embeds and indexes
+the chunks on its free tier with a multilingual model. The LLM is Ollama Cloud.
+Credentials sit in an SSM SecureString. The portfolio's shared local Grafana
+(`portfolio-infra`) reads CloudWatch for latency, errors and spend; the shared
+MLflow keeps the evaluation runs. The Streamlit UI runs locally against the
+deployed API.
 
 ## Documentation
 
