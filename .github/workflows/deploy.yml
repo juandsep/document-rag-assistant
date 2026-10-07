@@ -1,0 +1,85 @@
+# Builds the API image, pushes it to ECR and rolls it out to the Lambda
+# function, on every push to dev (the branch the deploy role trusts, see
+# infra/main.tf github_branch). Authenticates through GitHub's OIDC provider:
+# no AWS keys are stored anywhere.
+#
+# Repository variables, from `terraform output` (see infra/README.md):
+#   AWS_DEPLOY_ROLE   deploy_role_arn
+#   ECR_REPOSITORY    ecr_repository_url
+#   LAMBDA_FUNCTION   function_name
+#   FUNCTION_URL      function_url
+# The job skips while AWS_DEPLOY_ROLE is unset and fails loudly if it is set
+# but anything else is missing.
+name: deploy
+
+on:
+  push:
+    branches: [dev]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    if: vars.AWS_DEPLOY_ROLE != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      AWS_REGION: us-east-1
+      ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
+      LAMBDA_FUNCTION: ${{ vars.LAMBDA_FUNCTION }}
+      FUNCTION_URL: ${{ vars.FUNCTION_URL }}
+    steps:
+      - name: Check the required variables
+        run: |
+          missing=0
+          for name in ECR_REPOSITORY LAMBDA_FUNCTION FUNCTION_URL; do
+            if [ -z "${!name}" ]; then
+              echo "::error::repository variable $name is empty; see infra/README.md"
+              missing=1
+            fi
+          done
+          exit $missing
+
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # No provenance or SBOM attestations: they turn the push into an image
+      # index, which Lambda rejects.
+      - name: Build and push the image
+        run: |
+          IMAGE="$ECR_REPOSITORY:${GITHUB_SHA::12}"
+          aws ecr get-login-password | docker login --username AWS --password-stdin "${ECR_REPOSITORY%%/*}"
+          docker build --provenance=false --sbom=false --platform linux/amd64 \
+            -f docker/Dockerfile -t "$IMAGE" .
+          docker push "$IMAGE"
+          echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
+
+      - name: Roll out to Lambda
+        run: |
+          aws lambda update-function-code --function-name "$LAMBDA_FUNCTION" \
+            --image-uri "$IMAGE" --query 'LastUpdateStatus' --output text
+          aws lambda wait function-updated-v2 --function-name "$LAMBDA_FUNCTION"
+
+      # A cold start loads the SecureString and the Qdrant client, so give it
+      # a few tries before calling the rollout broken.
+      - name: Smoke test /health
+        run: |
+          for attempt in 1 2 3 4 5; do
+            if curl --fail-with-body -sS --max-time 30 "${FUNCTION_URL%/}/health"; then
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "::error::/health did not answer after the rollout"
+          exit 1
