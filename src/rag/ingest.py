@@ -1,7 +1,8 @@
 """Document ingestion: load, clean and chunk.
 
-Plain text, Markdown, PDF and DOCX load into pages of text (a PDF keeps its
-page numbers, so answers can cite them). The PDF and DOCX parsers live in the
+Plain text, Markdown, digital PDF and DOCX load into pages of text (a PDF keeps
+its page numbers, so answers can cite them). Scanned PDFs are not read: there
+is no OCR, and `textless_pages` lets indexing report them. The PDF and DOCX parsers live in the
 `ingest` dependency group: indexing needs them, the API image does not.
 """
 
@@ -122,9 +123,23 @@ def load_pages(path: Path) -> list[tuple[int | None, str]]:
     )
 
 
-def chunk_document(path: Path, doc_id: str) -> list[Chunk]:
-    """Load, clean and chunk one file; empty pages yield nothing."""
+def textless_pages(pages: list[tuple[int | None, str]]) -> list[int]:
+    """Pages with no extractable text: scanned images, in a PDF.
+
+    Only digital PDFs (with a text layer) are supported; there is no OCR, so
+    indexing reports these instead of silently storing nothing.
+    """
+    return [page for page, text in pages if page is not None and not clean(text)]
+
+
+def chunk_pages(pages: list[tuple[int | None, str]], doc_id: str) -> list[Chunk]:
+    """Clean and chunk loaded pages; empty pages yield nothing."""
     chunks: list[Chunk] = []
-    for page, text in load_pages(path):
+    for page, text in pages:
         chunks += chunk_text(clean(text), doc_id, page=page, start_index=len(chunks))
     return chunks
+
+
+def chunk_document(path: Path, doc_id: str) -> list[Chunk]:
+    """Load, clean and chunk one file."""
+    return chunk_pages(load_pages(path), doc_id)
