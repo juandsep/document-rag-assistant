@@ -155,3 +155,45 @@ def test_qdrant_prune_refuses_without_a_serving_version():
     with pytest.raises(LookupError):
         client = _FakeQdrant()
         QdrantRetriever(client=client, alias="rag", http=client.http).prune()
+
+
+def test_qdrant_embeds_translations_and_returns_each_passage_once():
+    from rag.ingest import Chunk
+
+    client = _FakeQdrant()
+    retriever = QdrantRetriever(client=client, alias="rag", http=client.http)
+    original = Chunk("gift.md", 0, "tarjetas no se cambian por dinero")
+    version = retriever.upsert(
+        [
+            original,
+            Chunk(
+                **{
+                    **original.__dict__,
+                    "search_text": "gift cards are not exchanged for cash",
+                }
+            ),
+        ]
+    )
+
+    ids = {p.id for p in client.collections[version]}
+    embedded = sorted(p.vector.text for p in client.collections[version])
+    assert len(ids) == 2
+    assert embedded == [
+        "passage: gift cards are not exchanged for cash",
+        "passage: tarjetas no se cambian por dinero",
+    ]
+    # Both points carry the original text; the passage comes back once.
+    hits = retriever.query("tarjetas dinero cash", top_k=5)
+    assert [h.text for h in hits] == ["tarjetas no se cambian por dinero"]
+
+
+def test_local_retriever_returns_each_passage_once(tmp_path):
+    from rag.ingest import Chunk
+
+    retriever = LocalRetriever(str(tmp_path), embed=_fake_embed)
+    chunk = Chunk("refunds.txt", 0, "refund in ten days")
+    retriever.upsert(
+        [chunk, Chunk(**{**chunk.__dict__, "search_text": "refund refund"})]
+    )
+
+    assert len(retriever.query("refund", top_k=5)) == 1

@@ -18,3 +18,39 @@
 {"q": "Does Norte Retail have physical stores?", "relevant": [], "answer": ""}
 {"q": "¿Cuál fue la facturación del año pasado?", "relevant": [], "answer": ""}
 {"q": "Do you offer a loyalty points program?", "relevant": [], "answer": ""}
+{"q": "¿Cuánto cuesta el NR-2210?", "relevant": ["catalogo.docx"], "answer": "489.000 COP; es la silla ergonómica Cordillera."}
+{"q": "What is the warranty on SKU NR-4400?", "relevant": ["catalogo.docx"], "answer": "24 months (it is the Llanos double mattress)."}
+{"q": "¿Qué producto es el NR-3355?", "relevant": ["catalogo.docx"], "answer": "El parlante portátil Amazonas resistente al agua, de 310.000 COP."}
+{"q": "How much is the 27-inch 4K monitor?", "relevant": ["catalogo.docx"], "answer": "1,390,000 COP (Monitor Pacífico, NR-1077)."}
+{"q": "¿Puedo enviar la silla NR-2210 a Chile?", "relevant": ["catalogo.docx", "envios-internacionales.md"], "answer": "No, los muebles no se envían al exterior."}
+{"q": "What is the minimum wholesale order?", "relevant": ["mayoristas.pdf"], "answer": "5,000,000 COP before VAT."}
+{"q": "¿Qué descuento tiene un pedido mayorista de 25.000.000 COP?", "relevant": ["mayoristas.pdf"], "answer": "12% de descuento sobre el total antes de IVA."}
+{"q": "Can a new business account pay net 30 on its first order?", "relevant": ["mayoristas.pdf"], "answer": "No, the first three orders of a new business account must be paid in advance."}
+{"q": "Can a wholesale order be returned because we changed our mind?", "relevant": ["mayoristas.pdf"], "answer": "No, wholesale orders can only be returned for manufacturing defects within 15 days of delivery."}
+{"q": "How long does wholesale delivery take?", "relevant": ["mayoristas.pdf"], "answer": "5 to 8 business days, within Colombia only, on pallets."}
+{"q": "¿Cuánto cuesta armar el escritorio NR-2215?", "relevant": ["instalacion.pdf"], "answer": "90.000 COP, porque incluye la conexión del motor."}
+{"q": "Do you assemble furniture in Barranquilla?", "relevant": ["instalacion.pdf"], "answer": "No, assembly is only available in Bogotá, Medellín and Cali."}
+{"q": "¿Con cuánta anticipación se agenda el armado?", "relevant": ["instalacion.pdf"], "answer": "Con al menos 48 horas de anticipación."}
+{"q": "¿Qué pasa si el técnico no llega a la cita de armado?", "relevant": ["instalacion.pdf"], "answer": "El armado es gratis."}
+{"q": "How much does international shipping cost?", "relevant": ["envios-internacionales.md"], "answer": "A flat 95,000 COP per order, for orders up to 20 kg."}
+{"q": "¿Puedo enviar un perfume a México?", "relevant": ["envios-internacionales.md"], "answer": "No, los perfumes no se envían al exterior."}
+{"q": "Who pays the import duties on international orders?", "relevant": ["envios-internacionales.md"], "answer": "The customer, to the carrier on delivery."}
+{"q": "¿Cuánto tiempo dura una tarjeta de regalo?", "relevant": ["tarjetas-regalo.md"], "answer": "Vence 12 meses después de la compra."}
+{"q": "Can I get cash for my gift card balance?", "relevant": ["tarjetas-regalo.md"], "answer": "No, gift cards are not exchanged for cash or refunded."}
+{"q": "¿Puedo comprar una tarjeta de regalo con otra tarjeta de regalo?", "relevant": ["tarjetas-regalo.md"], "answer": "No, no se puede."}
+{"q": "How long is the password reset link valid?", "relevant": ["seguridad-cuenta.txt"], "answer": "30 minutes."}
+{"q": "¿Qué pasa si fallo cinco veces la contraseña?", "relevant": ["seguridad-cuenta.txt"], "answer": "La cuenta se bloquea por 15 minutos."}
+{"q": "Is two-step verification mandatory?", "relevant": ["seguridad-cuenta.txt"], "answer": "Optional for customers, mandatory for business accounts."}
+{"q": "¿Norte Retail me puede pedir la contraseña por teléfono?", "relevant": ["seguridad-cuenta.txt"], "answer": "No; un mensaje que la pida es fraude."}
+{"q": "Do you match a competitor's lower price?", "relevant": ["igualacion-precios.txt"], "answer": "Yes, for an identical product in a Colombian online store, before buying or up to 7 days after."}
+{"q": "¿Igualan precios de vendedores de marketplace?", "relevant": ["igualacion-precios.txt"], "answer": "No."}
+{"q": "How many days after buying can I ask for a price match?", "relevant": ["igualacion-precios.txt"], "answer": "Up to 7 days."}
+{"q": "¿Puedo cambiar la dirección de entrega después de comprar?", "relevant": ["preguntas-frecuentes.md"], "answer": "Sí, mientras el pedido no haya salido del almacén."}
+{"q": "¿Venden productos reacondicionados?", "relevant": ["preguntas-frecuentes.md"], "answer": "No, solo productos nuevos."}
+{"q": "¿Cuánto cuesta el envío exprés?", "relevant": ["envios.txt"], "answer": "25.000 COP; llega al día hábil siguiente si se pide antes de las 12:00 m."}
+{"q": "What phone number can business customers call?", "relevant": ["soporte.txt"], "answer": "+57 601 555 0100."}
+{"q": "¿Cuántos empleados tiene Norte Retail?", "relevant": [], "answer": ""}
+{"q": "Who manufactures the Andes 14 laptop?", "relevant": [], "answer": ""}
+{"q": "Does Norte Retail have a mobile app?", "relevant": [], "answer": ""}
+{"q": "¿Qué descuentos hay en Black Friday?", "relevant": [], "answer": ""}
+{"q": "When was Norte Retail founded?", "relevant": [], "answer": ""}
