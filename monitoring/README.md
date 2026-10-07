@@ -35,13 +35,22 @@ Requires Docker and an AWS profile that can read CloudWatch
 "Receive CloudWatch billing alerts" is turned on once in the Billing console.
 
 ```bash
-aws sso login --profile <profile>                 # if the profile uses SSO
-AWS_PROFILE=<profile> docker compose -f monitoring/docker-compose.yml up -d
+aws sso login --profile rag
+eval "$(aws configure export-credentials --profile rag --format env)"
+docker compose -f monitoring/docker-compose.yml up -d
 open http://localhost:3000                        # dashboard "Document RAG · API on Lambda"
 docker compose -f monitoring/docker-compose.yml down
 ```
 
-`~/.aws` is mounted read-only; no key is copied into this folder. The
+Grafana's AWS SDK cannot read an `sso-session` profile (it fails with
+`failed to get shared config profile`), so the session's temporary
+credentials go in as environment variables; they expire with the session and
+no key is written anywhere. With a classic profile, `AWS_PROFILE=<profile>`
+and the read-only `~/.aws` mount work instead.
+
+Checked against live data on 2026-10-07: all 13 panel queries return series
+(Lambda metrics, per-service and total charges, and the four Logs Insights
+panels). The
 **Function** selector switches between staging and production. The dashboard
 is code ([`grafana/dashboards/rag.json`](grafana/dashboards/rag.json)): edit it
 there, not only in the UI.
