@@ -44,7 +44,8 @@ def test_answer_returns_only_the_cited_passages_and_prompts_from_them():
     assert [s.doc_id for s in result.sources] == ["refunds.txt"]
     user = seen["messages"][1]["content"]
     assert "[1] (refunds.txt)" in user and "[2] (shipping.txt)" in user
-    assert user.endswith("How long for a refund?")
+    assert "How long for a refund?" in user
+    assert user.endswith("Write the whole reply in English.")
 
 
 def test_answer_reads_full_width_citations():
@@ -122,3 +123,17 @@ def test_load_secrets_fills_missing_keys_and_skips_placeholders(monkeypatch):
     assert os.environ["QDRANT_API_KEY"] == "q"
     assert "OLLAMA_API_KEY" not in os.environ
     assert os.environ["X"] == "from-env"
+
+
+@pytest.mark.parametrize(
+    ("question", "language"),
+    [
+        ("How long is the warranty on a laptop?", "English"),
+        ("Do you ship to Argentina?", "English"),
+        ("¿Cuánto tarda el envío?", "Spanish"),
+        ("Puedo pagar en cuotas con débito", "Spanish"),
+        ("Quien es el gerente", "Spanish"),
+    ],
+)
+def test_question_language(question, language):
+    assert chain.question_language(question) == language
