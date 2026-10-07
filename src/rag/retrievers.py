@@ -14,6 +14,7 @@ import json
 import math
 import os
 import re
+import urllib.request
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -112,14 +113,22 @@ class QdrantRetriever:
     new `<alias>-v<UTC timestamp>` collection; queries go through the alias
     (`QDRANT_ALIAS`), which `promote` moves atomically. The first version is
     promoted on its own, later ones only when asked.
+
+    The read path (`query`, the serving alias) is plain REST over urllib, so
+    the API image ships without qdrant-client, whose import alone cost ~2.5 s
+    of every cold start. Writes (`upsert`, `promote`, `prune`) use the client,
+    installed with the `ingest` dependency group.
     """
 
     MODEL = "intfloat/multilingual-e5-small"
     SIZE = 384
     BATCH = 64
 
-    def __init__(self, client: Any = None, alias: str | None = None) -> None:
+    def __init__(
+        self, client: Any = None, alias: str | None = None, http: Any = None
+    ) -> None:
         self._client = client
+        self._http = http or _qdrant_rest
         self.alias = alias or os.getenv("QDRANT_ALIAS", "document-rag")
 
     @property
@@ -168,9 +177,10 @@ class QdrantRetriever:
         return version
 
     def _serving(self) -> str | None:
-        aliases = self.client.get_aliases().aliases
+        aliases = self._http("GET", "/aliases")["result"]["aliases"]
         return next(
-            (a.collection_name for a in aliases if a.alias_name == self.alias), None
+            (a["collection_name"] for a in aliases if a["alias_name"] == self.alias),
+            None,
         )
 
     def promote(self, version: str) -> None:
@@ -216,18 +226,36 @@ class QdrantRetriever:
         return doomed
 
     def query(self, text: str, top_k: int = 5) -> list[Retrieved]:
-        response = self.client.query_points(
-            self.alias,
-            query=self._document(f"query: {text}"),
-            limit=top_k,
-            with_payload=True,
-        )
+        body = {
+            "query": {"text": f"query: {text}", "model": self.MODEL},
+            "limit": top_k,
+            "with_payload": True,
+        }
+        points = self._http("POST", f"/collections/{self.alias}/points/query", body)
         return [
             Retrieved(
-                p.payload["doc_id"], p.payload["text"], p.score, p.payload.get("page")
+                p["payload"]["doc_id"],
+                p["payload"]["text"],
+                p["score"],
+                p["payload"].get("page"),
             )
-            for p in response.points
+            for p in points["result"]["points"]
         ]
+
+
+def _qdrant_rest(method: str, path: str, body: dict | None = None) -> dict:
+    """One authenticated call to the Qdrant REST API."""
+    request = urllib.request.Request(
+        os.environ["QDRANT_URL"].rstrip("/") + path,
+        method=method,
+        data=json.dumps(body).encode() if body is not None else None,
+        headers={
+            "api-key": os.environ["QDRANT_API_KEY"],
+            "content-type": "application/json",
+        },
+    )
+    with urllib.request.urlopen(request, timeout=20) as response:
+        return json.load(response)
 
 
 def get_retriever(backend: str | None = None) -> Retriever:

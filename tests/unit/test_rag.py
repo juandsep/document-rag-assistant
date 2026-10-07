@@ -84,22 +84,32 @@ class _FakeQdrant:
                 alias = op.create_alias
                 self.aliases[alias.alias_name] = alias.collection_name
 
-    def query_points(self, name, query, limit, with_payload):
-        words = set(query.text.removeprefix("query: ").split())
+    def http(self, method, path, body=None):
+        """The REST read path: GET /aliases and POST .../points/query."""
+        if path == "/aliases":
+            aliases = [
+                {"alias_name": a, "collection_name": c} for a, c in self.aliases.items()
+            ]
+            return {"result": {"aliases": aliases}}
+        name = path.split("/")[2]
+        words = set(body["query"]["text"].removeprefix("query: ").split())
         points = sorted(
             (
-                NS(score=len(words & set(p.payload["text"].split())), payload=p.payload)
+                {
+                    "score": len(words & set(p.payload["text"].split())),
+                    "payload": p.payload,
+                }
                 for p in self.collections[self.aliases.get(name, name)]
             ),
-            key=lambda point: point.score,
+            key=lambda point: point["score"],
             reverse=True,
         )
-        return NS(points=points[:limit])
+        return {"result": {"points": points[: body["limit"]]}}
 
 
 def test_qdrant_retriever_promotes_the_first_version_only():
     client = _FakeQdrant()
-    retriever = QdrantRetriever(client=client, alias="rag")
+    retriever = QdrantRetriever(client=client, alias="rag", http=client.http)
 
     first = retriever.upsert(chunk_text("old refund policy", doc_id="old.txt"))
     chunks = [chunk_text(f"filler {i}", doc_id=f"f{i}")[0] for i in range(70)]
@@ -117,7 +127,7 @@ def test_qdrant_retriever_promotes_the_first_version_only():
 
 def test_qdrant_retriever_embeds_with_e5_prefixes():
     client = _FakeQdrant()
-    retriever = QdrantRetriever(client=client, alias="rag")
+    retriever = QdrantRetriever(client=client, alias="rag", http=client.http)
     version = retriever.upsert(chunk_text("refund", doc_id="a.txt"))
 
     [point] = client.collections[version]
@@ -132,7 +142,7 @@ def test_qdrant_prune_keeps_serving_newer_candidates_and_one_rollback():
         n: [] for n in ["rag-v1", "rag-v2", "rag-v3", "rag-v4", "rag-v5", "other-v1"]
     }
     client.aliases = {"rag": "rag-v4"}
-    retriever = QdrantRetriever(client=client, alias="rag")
+    retriever = QdrantRetriever(client=client, alias="rag", http=client.http)
 
     assert retriever.prune() == ["rag-v2", "rag-v1"]
     assert len(client.collections) == 6  # dry run by default
@@ -143,4 +153,5 @@ def test_qdrant_prune_keeps_serving_newer_candidates_and_one_rollback():
 
 def test_qdrant_prune_refuses_without_a_serving_version():
     with pytest.raises(LookupError):
-        QdrantRetriever(client=_FakeQdrant(), alias="rag").prune()
+        client = _FakeQdrant()
+        QdrantRetriever(client=client, alias="rag", http=client.http).prune()
