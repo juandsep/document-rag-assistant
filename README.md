@@ -33,7 +33,8 @@ balancer, no VPC, nothing billed while idle. Qdrant Cloud embeds and indexes the
 chunks on its free tier with a multilingual model. The LLM is Ollama
 Cloud. Credentials sit in an SSM SecureString. A local Grafana reads
 CloudWatch for latency, errors and spend; the portfolio's shared MLflow keeps
-the evaluation runs. The Streamlit UI runs locally against the deployed API.
+the evaluation runs. The Streamlit UI runs on Streamlit Community Cloud and
+calls the API with a key.
 
 ## Documentation
 

@@ -109,9 +109,9 @@ variable "reserved_concurrency" {
 }
 
 variable "function_url_auth_type" {
-  description = "AWS_IAM keeps the endpoint private (callers sign with SigV4); NONE makes it public, so anyone with the URL can spend model time on the Ollama host."
+  description = "NONE (default) makes the URL public so the Hugging Face Space can call it; /query still demands the API_KEY from the SecureString in an X-API-Key header. AWS_IAM makes callers sign with SigV4 instead."
   type        = string
-  default     = "AWS_IAM"
+  default     = "NONE"
 
   validation {
     condition     = contains(["AWS_IAM", "NONE"], var.function_url_auth_type)
@@ -161,7 +161,8 @@ variable "rag_secret_json" {
   default     = <<-JSON
     {
       "QDRANT_API_KEY": "REPLACE_ME",
-      "OLLAMA_API_KEY": "REPLACE_ME"
+      "OLLAMA_API_KEY": "REPLACE_ME",
+      "API_KEY": "REPLACE_ME"
     }
   JSON
 }

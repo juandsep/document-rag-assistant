@@ -129,8 +129,15 @@ The corpus lives in S3 and the credentials in an SSM SecureString, to be read by
 the function role (F3) — not injected as environment variables. `reserved_concurrency`
 caps how much a reachable URL can spend.
 
-Streamlit is not deployed: it needs a long-lived websocket server, which a
-Function URL does not provide. It runs locally against the deployed API.
+The Streamlit UI cannot run on Lambda: it needs a long-lived websocket
+server, which a Function URL does not provide. It runs on Streamlit Community
+Cloud (free, deployed from this repository's `main`), which calls the Function
+URL with the `X-API-Key` header. The URL itself is public (`NONE` auth) so a
+hosted UI can reach it without AWS credentials; `/query` refuses requests
+without the key, and a deployed function with no key configured refuses
+everything. Hugging Face Spaces was the first choice and was dropped: Gradio
+and Docker Spaces now need a PRO subscription, and a free static Space would
+have to ship the key to the browser.
 
 The chat model is Ollama Cloud's HTTP API, reachable from the function over
 the internet. Qdrant Cloud embeds the chunks and the questions itself

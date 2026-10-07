@@ -76,9 +76,11 @@ can spend even if someone finds it.
    SecureString as `OLLAMA_API_KEY` (step 5). A self-hosted Ollama works too, as
    long as Lambda can reach it and it asks for a token: an open Ollama server is
    an open proxy to the hardware it runs on.
-3. `function_url_auth_type` defaults to `AWS_IAM`: callers sign with SigV4 and
-   nobody can spend model time by accident. Set it to `NONE` only for a public
-   demo, and know that the URL then accepts anyone.
+3. `function_url_auth_type` defaults to `NONE`: the URL is public so the
+   Streamlit UI can call it, and `/query` demands the `API_KEY` from the
+   SecureString in an `X-API-Key` header (generate one with
+   `openssl rand -hex 32`). `reserved_concurrency` and the budget cap what a
+   leaked key could spend. `AWS_IAM` makes callers sign with SigV4 instead.
 4. The account gets an IAM provider for `token.actions.githubusercontent.com`.
    AWS allows one per account: if it already exists, set
    `create_github_oidc_provider = false` or apply fails with
@@ -100,13 +102,12 @@ can spend even if someone finds it.
 7. `image_tag` must exist in ECR before the function can start: `bootstrap` is
    only there so the first apply has something to point at.
 
-## Calling a private Function URL
+## Calling the Function URL
 
 ```bash
-curl --aws-sigv4 "aws:amz:us-east-1:lambda" \
-     --user "$AWS_ACCESS_KEY_ID:$AWS_SECRET_ACCESS_KEY" \
-     -X POST "$(terraform output -raw function_url)" \
-     -H "content-type: application/json" -d '{"q": "What is the return policy?"}'
+curl -X POST "$(terraform output -raw function_url)query" \
+     -H "content-type: application/json" -H "X-API-Key: $API_KEY" \
+     -d '{"q": "What is the return policy?"}'
 ```
 
 ## Configuration
@@ -125,7 +126,8 @@ git-ignored `.env`.
 | `OLLAMA_BASE_URL` / `OLLAMA_MODEL` / `OLLAMA_API_KEY` | Ollama endpoint (local default `http://localhost:11434`, deployed `https://ollama.com`), generation model (default `gpt-oss:120b`) and bearer token |
 | `EMBEDDING_MODEL` | embedding model the `local` backend asks Ollama for |
 | `APP_SECRET_PARAMETER` | SecureString whose JSON keys the API copies into its environment at startup (Lambda only; local runs use `.env`) |
-| `RAG_API_URL` | API base URL consumed by the UI |
+| `API_KEY` | key `/query` demands in `X-API-Key` (SecureString on Lambda; unset locally leaves the API open) |
+| `RAG_API_URL` / `RAG_API_KEY` | API base URL and key the Streamlit UI sends |
 
 ## Conventions
 
