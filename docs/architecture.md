@@ -81,9 +81,11 @@ the Grafana dashboard reads it with Logs Insights; nothing on the request path
 calls a metrics service.
 
 On top of that, `scripts/evaluate.py` turns "the answers feel better" into a
-number attached to a pull request. It scores 20 labelled questions
-(`eval/questions.jsonl`, 16 answerable and 4 the corpus cannot answer, in
-Spanish and English) over the fictional `eval/corpus/`:
+number attached to a pull request. It scores 56 labelled questions
+(`eval/questions.jsonl`, 47 answerable and 9 the corpus cannot answer, in
+Spanish and English, with reference answers) over the fictional
+`eval/corpus/`: 14 documents in plain text, Markdown, a DOCX catalog with a
+product table and two PDFs, one of them two pages long.
 
 - **Retrieval**, at document level: precision@k, recall@k, hit rate@k, MRR.
 - **Answers** (`--chain`): whether the chain answered the answerable questions
@@ -115,6 +117,11 @@ Known limitation: short English questions over Spanish documents rank lower.
 the first), so at k = 3 the chain never sees it and refuses. The API's default
 `top_k` of 5 covers it; a stronger multilingual embedding model would fix it at
 the source.
+
+On the 14-document set (v1.1), dense retrieval scores recall@3 0.862, MRR
+0.738 and 52/56 right decisions. Every miss is a question in one language
+about a document in the other: the right document is not in the top five, and
+the chain then refuses, correctly given what it saw.
 
 ### RAG against the model alone
 

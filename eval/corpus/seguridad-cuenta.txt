@@ -1,0 +1,9 @@
+Account security
+
+Customers sign in with their email and a password of at least 10 characters. Two-step verification by SMS or an authenticator app is optional for customers and mandatory for business accounts.
+
+Password resets are requested from the sign-in page; the reset link arrives by email and expires after 30 minutes. After 5 failed sign-in attempts the account is locked for 15 minutes.
+
+Norte Retail never asks for passwords, card numbers or verification codes by phone, chat or email. A message asking for them is fraud and should be reported to seguridad@norteretail.example.
+
+If an order was placed without the customer's permission, the customer must report it within 48 hours of the purchase; Norte Retail then cancels the order if it has not shipped and opens a fraud review with the card issuer.
