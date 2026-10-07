@@ -2,7 +2,7 @@
 #
 # No load balancer and no VPC: the Function URL is HTTPS on a public hostname
 # and costs nothing, and Lambda keeps its default network access, so no NAT
-# gateway or subnet has to exist for the function to reach Ollama and S3.
+# gateway or subnet has to exist for the function to reach Qdrant and Ollama.
 
 resource "aws_lambda_function" "api" {
   function_name = "${local.name_prefix}-api"
@@ -55,7 +55,8 @@ resource "aws_iam_role_policy_attachment" "function_logs" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
-# What the chain may do: read the corpus and read its own credentials.
+# What the chain may do: read its own credentials. Retrieval and generation
+# are outside AWS (Qdrant Cloud, Ollama Cloud).
 resource "aws_iam_role_policy" "function" {
   name = "${local.name_prefix}-runtime"
   role = aws_iam_role.function.id
@@ -63,16 +64,6 @@ resource "aws_iam_role_policy" "function" {
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
-      {
-        Effect   = "Allow"
-        Action   = ["s3:GetObject"]
-        Resource = ["${aws_s3_bucket.corpus.arn}/*"]
-      },
-      {
-        Effect   = "Allow"
-        Action   = ["s3:ListBucket"]
-        Resource = [aws_s3_bucket.corpus.arn]
-      },
       {
         Effect   = "Allow"
         Action   = ["ssm:GetParameter"]

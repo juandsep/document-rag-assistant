@@ -34,7 +34,7 @@ labelled question set, the same model ([details](docs/architecture.md#rag-agains
 
 Only the API runs in AWS: one Lambda function serving FastAPI through a
 Function URL, with no load balancer or VPC, so nothing is billed while idle
-(about $0.10/month). Everything else lives on free tiers outside AWS: Qdrant
+(about $0.05/month). Everything else lives on free tiers outside AWS: Qdrant
 Cloud stores the vectors and computes the embeddings, Ollama Cloud generates,
 Streamlit Community Cloud hosts the UI and a shared MLflow keeps the
 evaluation runs. Keys sit in an SSM SecureString; every push to `dev` ships a
