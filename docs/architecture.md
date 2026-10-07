@@ -43,9 +43,11 @@ everything through. The model judges sufficiency instead.
 .txt .md .pdf .docx ──▶ load (pages) ──▶ clean ──▶ chunk ──▶ dedupe ──▶ translate ──▶ upsert (index vN)
 ```
 
-`ingest.load_pages` reads plain text and Markdown whole, PDFs page by page
+`ingest.load_pages` reads plain text and Markdown whole, digital PDFs page by page
 (the page number travels with each chunk, so answers can cite it) and DOCX
-paragraphs plus tables. Cleaning rejoins words hyphenated across PDF lines and
+paragraphs plus tables. There is no OCR: a PDF page without a text layer
+(scanned) is reported by `index_docs.py` and left out, and a fully scanned PDF
+is skipped. Cleaning rejoins words hyphenated across PDF lines and
 collapses whitespace. Chunking is a sliding window (`ingest.chunk_text`, 800
 characters, 100 of overlap) so a fact split across a boundary is still
 retrievable. `scripts/index_docs.py` drops chunks whose text already appeared,
@@ -147,39 +149,39 @@ passage. Cross-language recall was the real gap, and translation closed it.
 ### RAG against the model alone
 
 `scripts/compare.py` asks every labelled question twice with the same model:
-through the chain, and alone (told it may say it does not know). An LLM judge
-grades each answer to an answerable question against its reference answer in
+through the chain, and alone (told it may say it does not know). An
+**independent judge**, DeepSeek's `deepseek-flash` through its API, grades each
+answer to an answerable question against its reference answer in
 `eval/questions.jsonl`, on facts only; for the questions the corpus cannot
-answer, refusing is right and any answer counts as a hallucination.
+answer, refusing is right and any answer counts as a hallucination. Without
+`DEEPSEEK_API_KEY` the script falls back to the answering model grading itself
+and warns about it.
 
-| `gpt-oss:120b`, 56 questions (v1.1) | RAG (k = 5) | Model alone |
+| `gpt-oss:120b`, 56 questions, judged by `deepseek-flash` | RAG (k = 5) | Model alone |
 |---|---|---|
-| Correct answers (47 answerable) | **100%** | 19% |
-| Refused although answerable | 0% | 75% |
+| Correct answers (47 answerable) | **100%** | 17% |
+| Refused although answerable | 0% | 70% |
 | Refused the 9 unanswerable | **100%** | 100% |
-| Hallucinated (of all 56) | **0%** | 5% |
-| Latency p50 / p95 | 1.32 s / 1.62 s | 0.94 s / 1.33 s |
+| Hallucinated (of all 56) | **0%** | 11% |
+| Latency p50 / p95 | 1.35 s / 1.74 s | 1.00 s / 1.37 s |
 | Prompt tokens, average | 936 | 136 |
 
-On the first 20-question set the model alone scored 19–25% correct and 10–15%
-hallucinated across runs; read its column as a range.
-
 The model alone mostly refuses, which is the honest failure: it cannot know a
-fictional store's policies. Where it does answer it guesses — where the data is
-stored, what happens after five failed sign-ins, how price matching works.
-Retrieval buys correctness and grounded refusals for about 0.3 s and 770
-prompt tokens per question.
+fictional store's policies. Where it does answer it guesses — the return
+window, what to do with a late order, where the data is stored, whether
+two-step verification is mandatory. Retrieval buys correctness and grounded
+refusals for about 0.35 s and 800 prompt tokens per question.
 
-Read it with its limits: 56 questions over 14 short documents, and the judge is
-the same model that answers; one RAG answer was first failed because the
-reference answer added a fact from another question, fixed in the reference. The first judge prompt also failed a correct
-answer for being in the wrong language; it now grades facts only, and that
-answer ("12 months", given in Spanish to an English question) exposed a real
-slip: over Spanish passages the model followed the passages' language in 6 of
-12 English replies. The prompt now names the reply language
-(`chain.question_language`, Spanish or English), which gave 18/18; a rerun
-keeps the RAG at 100% correct and 0% hallucinated (p95 1.35 s), while the model
-alone moved to 25% correct and 10% hallucinated, so read its column as a range.
+**How much the judge mattered.** Both judges graded the same 58 non-refused
+answers: they agreed on 56 (97%). Grading itself, `gpt-oss` was harsher on one
+RAG answer and more lenient on one of its own unretrieved guesses, so
+self-grading had been close but not neutral; the table above uses the
+independent judge. Earlier runs, judged by the answering model, put the model
+alone at 15–25% correct and 5–15% hallucinated across question sets.
+
+Read it with its limits: 56 questions over 14 short documents; one RAG answer
+was first failed because its reference answer included a fact from another
+question, fixed in the reference.
 
 ## Failure behaviour
 
