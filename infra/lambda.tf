@@ -25,6 +25,12 @@ resource "aws_lambda_function" "api" {
   # The adapter extension takes over the runtime; nothing else is configured
   # here, so the same image still runs with `docker run` or uvicorn locally.
   depends_on = [aws_cloudwatch_log_group.api]
+
+  # image_tag only seeds the first apply; deploy.yml owns the image after
+  # that. Without this, every apply would roll the function back to it.
+  lifecycle {
+    ignore_changes = [image_uri]
+  }
 }
 
 data "aws_iam_policy_document" "function_assume" {
