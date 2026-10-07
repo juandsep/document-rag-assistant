@@ -122,9 +122,10 @@ can spend even if someone finds it.
 
    After that, `deploy.yml` ships every image.
 8. A new account's Lambda concurrency limit is 10, and AWS keeps 10
-   unreserved, so any `reserved_concurrency` above 0 fails. Set it to `-1`
-   (the account limit then caps the function at 10) or raise the "Concurrent
-   executions" quota in Service Quotas first.
+   unreserved, so any `reserved_concurrency` above 0 fails there. Request the
+   "Concurrent executions" quota (Service Quotas, `L-B99A9384`, default 1000;
+   approved here within a day) and keep `-1` until it lands; the default
+   reservation of 2 applies after that.
 9. `github_repo` is GitHub's immutable OIDC subject (`owner@id/name@id`), not
    `owner/name`: tokens carry the ids, and a trust on the name alone fails with
    `Not authorized to perform sts:AssumeRoleWithWebIdentity`.
