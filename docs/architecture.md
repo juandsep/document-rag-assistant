@@ -59,6 +59,15 @@ evaluation passes (the evaluation arrives with F5):
 uv run python -c "from rag.retrievers import QdrantRetriever; QdrantRetriever().promote('<version>')"
 ```
 
+Old versions pile up on the free cluster (4 GB of disk). `prune()` deletes
+them while keeping the serving version, every newer candidate and, by default,
+one older version for rollback. It only lists by default:
+
+```bash
+uv run --env-file .env python scripts/prune_versions.py          # what would go
+uv run --env-file .env python scripts/prune_versions.py --yes    # delete it
+```
+
 ## Evaluation
 
 Each query writes one `rag_query` JSON line (`monitoring.log_query`): status,
