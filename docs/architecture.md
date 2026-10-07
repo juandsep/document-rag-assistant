@@ -162,8 +162,10 @@ HTTPS and a public hostname with no load balancer, and no bill while nobody
 asks anything. The image is built from `docker/Dockerfile` and pushed to ECR;
 the Lambda Web Adapter inside it serves the same FastAPI app that runs locally.
 
-The corpus lives in S3 and the credentials in an SSM SecureString, to be read by
-the function role (F3) — not injected as environment variables. `reserved_concurrency`
+The credentials live in an SSM SecureString that the function reads at
+startup, not in environment variables. The corpus is indexed from wherever it
+sits (`scripts/index_docs.py <dir>`); the function never reads documents, only
+Qdrant. `reserved_concurrency`
 caps how much a reachable URL can spend.
 
 The Streamlit UI cannot run on Lambda: it needs a long-lived websocket
