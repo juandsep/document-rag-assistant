@@ -109,7 +109,7 @@ variable "reserved_concurrency" {
 }
 
 variable "function_url_auth_type" {
-  description = "NONE (default) makes the URL public so the Hugging Face Space can call it; /query still demands the API_KEY from the SecureString in an X-API-Key header. AWS_IAM makes callers sign with SigV4 instead."
+  description = "NONE (default) makes the URL public so the Streamlit UI can call it; /query still demands the API_KEY from the SecureString in an X-API-Key header. AWS_IAM makes callers sign with SigV4 instead."
   type        = string
   default     = "NONE"
 
@@ -131,9 +131,9 @@ variable "alert_email" {
 }
 
 variable "github_repo" {
-  description = "owner/name of the repository allowed to deploy."
+  description = "Repository allowed to deploy, as GitHub's immutable OIDC subject prefix names it: owner@owner_id/name@repo_id. Read it with `gh api repos/<owner>/<name>/actions/oidc/customization/sub` (sub_claim_prefix, without `repo:`). The ids keep a renamed or recreated repository from inheriting the role."
   type        = string
-  default     = "juandsep/document-rag-assistant"
+  default     = "juandsep@30062465/document-rag-assistant@1396685576"
 }
 
 variable "github_branch" {

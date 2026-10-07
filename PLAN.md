@@ -15,7 +15,7 @@ Each phase is one short-lived branch cut from `dev`, one pull request, one conce
 - [x] **F4 · API** — `POST /query` answers through the chain with its sources and a `status` (`ok`, `insufficient_context`, `llm_unavailable`); a vector-store outage returns `503`. `GET /health` stays dependency-free for the readiness check.
 - [x] **F5 · Monitoring** — CloudWatch alarms (`infra/monitoring.tf`); one `rag_query` JSON line per query (status, latency by stage, top score, tokens, model); the Grafana dashboard with Lambda, spend and per-query Logs Insights panels (untested against real CloudWatch data until the first deploy); `scripts/evaluate.py` scoring retrieval and answers on `eval/`, logged to the shared MLflow and gating `promote`. First run: recall@3 0.94, MRR 0.81, 19/20 answer decisions, p95 1.65 s.
 - [~] **F6 · UI** — `ui.py`: example questions about the demo corpus, answers with their status (warning on a refusal), sources with document, page and score, and the `X-API-Key` header. Tested headless with Streamlit's AppTest. Hosted on Streamlit Community Cloud (free; Hugging Face now charges for Streamlit-capable Spaces) from `main`, with `src/rag/requirements.txt` as its dependency file. Not yet: the Community Cloud app itself, which needs the deployed API URL and a one-time setup in its web console.
-- [~] **F7 · CI/CD and deployment** — `ci.yml` runs lint, tests (80% coverage floor) and the image build. `deploy.yml` builds the image without attestations (Lambda rejects image indexes), pushes it to ECR, updates the function and smoke-tests `/health` on every push to `dev`, through OIDC; it skips until `AWS_DEPLOY_ROLE` exists. `infra/` holds the Terraform (`terraform validate` passes). Not yet: the first `terraform apply`, which waits on an AWS credential.
+- [x] **F7 · CI/CD and deployment** — `ci.yml` runs lint, tests (80% coverage floor) and the image build. `deploy.yml` builds the image without attestations (Lambda rejects image indexes), pushes it to ECR, updates the function and smoke-tests `/health` on every push to `dev`, through OIDC; it skips until `AWS_DEPLOY_ROLE` exists. `infra/` holds the Terraform (`terraform validate` passes). Live: the first rollout through OIDC built, pushed, updated the function and passed `/health`.
 
 ## Decisions
 
@@ -35,16 +35,17 @@ Each phase is one short-lived branch cut from `dev`, one pull request, one conce
 - End-to-end p95 latency below 3 s.
 - Full traceability: every answer links back to the retrieved source documents.
 
-## Blocked before the first deploy
+## Deployment
 
-None of these can be finished by writing code alone:
+Live since 2026-10-07 in `us-east-1` (account `611581418226`, environment `staging`): `POST /query` behind the `X-API-Key`, deployed by `deploy.yml` on every push to `dev`. What it took, beyond the code:
 
-1. **An AWS credential method.** No identity has touched the account yet: no CLI on the development machine, no profile, and `terraform plan` fails on credentials. The first apply needs IAM Identity Center (SSO), a temporary IAM user profile, or an assumable role.
-2. **API keys.** An Ollama API key (ollama.com → Settings → Keys) and a Qdrant Cloud free cluster (its URL goes to `qdrant_url`, its key into the SecureString after the first apply; both also as the `QDRANT_URL` variable and `QDRANT_API_KEY` secret of the repository, for the keepalive).
-3. **Billing metrics.** "Receive CloudWatch billing alerts" must be turned on once in the Billing console, or `AWS/Billing` stays empty in Grafana.
-4. **Who may call the API** — decided: the Function URL is public (`NONE`) and `/query` demands an `API_KEY` from the SecureString in an `X-API-Key` header, which only the Streamlit UI holds.
+1. **AWS credentials** — IAM Identity Center (in `us-east-2`) with an `AdministratorAccess` permission set; the CLI profile `rag` logs in with `aws sso login --profile rag`. No long-lived keys anywhere; CI uses OIDC.
+2. **Keys** — Qdrant and Ollama Cloud keys plus the generated `API_KEY` live in the SSM SecureString, loaded from the git-ignored `.env`.
+3. **Lambda concurrency** — the new account's limit is 10 and AWS keeps 10 unreserved, so `reserved_concurrency = -1`; the account limit itself caps the function at 10 concurrent requests. Raise the quota before reserving any.
+4. **OIDC subject** — the repository signs its tokens with GitHub's immutable subject (`repo:owner@id/name@id:…`), which the deploy role now trusts.
+5. **Cold start** — 2.7 to 3.3 s of init at 1024 or 2048 MB alike (Python imports, not CPU); warm queries answer in 0.6 to 1.2 s.
 
-`infra/README.md` repeats the infrastructure items next to the commands that consume them.
+Not yet: the Streamlit Community Cloud app, which needs `main` and a one-time setup in its console.
 
 ## Reference
 

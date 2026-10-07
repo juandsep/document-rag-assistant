@@ -108,8 +108,26 @@ can spend even if someone finds it.
 
    From then on every push to `dev` builds the image, pushes it to ECR, rolls
    it out and checks `/health` (`.github/workflows/deploy.yml`).
-7. `image_tag` must exist in ECR before the function can start: `bootstrap` is
-   only there so the first apply has something to point at.
+7. The function needs its image in ECR before it can be created, so the
+   first apply runs in two steps:
+
+   ```bash
+   terraform apply -target=aws_ecr_repository.app -target=aws_ecr_lifecycle_policy.app
+   REPO=$(terraform output -raw ecr_repository_url)
+   aws ecr get-login-password | docker login --username AWS --password-stdin "${REPO%%/*}"
+   docker build --provenance=false --sbom=false --platform linux/amd64 \
+     -f ../docker/Dockerfile -t "$REPO:bootstrap" .. && docker push "$REPO:bootstrap"
+   terraform apply
+   ```
+
+   After that, `deploy.yml` ships every image.
+8. A new account's Lambda concurrency limit is 10, and AWS keeps 10
+   unreserved, so any `reserved_concurrency` above 0 fails. Set it to `-1`
+   (the account limit then caps the function at 10) or raise the "Concurrent
+   executions" quota in Service Quotas first.
+9. `github_repo` is GitHub's immutable OIDC subject (`owner@id/name@id`), not
+   `owner/name`: tokens carry the ids, and a trust on the name alone fails with
+   `Not authorized to perform sts:AssumeRoleWithWebIdentity`.
 
 ## Calling the Function URL
 
