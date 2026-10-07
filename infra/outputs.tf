@@ -14,10 +14,6 @@ output "ecr_repository_url" {
 }
 
 
-output "corpus_bucket" {
-  description = "S3 bucket holding the document corpus."
-  value       = aws_s3_bucket.corpus.id
-}
 
 output "deploy_role_arn" {
   description = "Role GitHub Actions assumes through OIDC: set as the AWS_DEPLOY_ROLE repository variable."

@@ -293,7 +293,7 @@
     },
     {
       "dot": "emerald",
-      "title": "Idle cost ~$0.10/month",
+      "title": "Idle cost ~$0.05/month",
       "items": [
         "Only the API runs in AWS",
         "Vectors, LLM, UI and MLflow on free tiers"

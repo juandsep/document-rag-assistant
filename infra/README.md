@@ -7,9 +7,8 @@ Terraform (`aws` `~> 6.0`) provisioning the resources the service needs:
 | AWS Lambda (container image) | runs the FastAPI app unchanged, through the Lambda Web Adapter |
 | Lambda Function URL | HTTPS entry point with no load balancer and no domain of your own |
 | Amazon ECR | image registry CI pushes to |
-| Amazon S3 | document corpus (versioned, encrypted, public access blocked) |
 | SSM Parameter Store (SecureString) | Qdrant and Ollama Cloud API keys |
-| IAM roles | function role (corpus read + own parameter read) and deploy role (GitHub Actions through OIDC, no stored access keys) |
+| IAM roles | function role (own parameter read only) and deploy role (GitHub Actions through OIDC, no stored access keys) |
 | CloudWatch Logs | one log group, 14-day retention |
 | CloudWatch alarms + SNS | errors, throttles and p95 latency, mailed to `alert_email` |
 | AWS Budgets | monthly alarm, so a surprise is noticed |
@@ -24,7 +23,7 @@ nothing has to be paid for while idle.
 infra/
 ├─ main.tf                    # provider, variables, ECR, log group, budget, OIDC trust and deploy role
 ├─ lambda.tf                  # function, Function URL and its IAM role
-├─ storage.tf                 # corpus bucket and the application SecureString
+├─ secret.tf                  # the application SecureString
 ├─ monitoring.tf              # CloudWatch alarms and their SNS email topic
 ├─ outputs.tf                 # Function URL, function name, ECR URL, deploy role ARN
 ├─ terraform.tfvars.example   # copy to terraform.tfvars and fill in
@@ -55,11 +54,10 @@ Idle, in `us-east-1`:
 | Lambda | $0 within the free tier (1M requests + 400k GB-s; a 3 s query at 1 GB is 3 GB-s) |
 | Function URL | $0 |
 | ECR (~0.4 GB image) | ~$0.04 |
-| S3 corpus | ~$0.02 |
 | SSM Parameter Store (standard tier) | $0 |
 | CloudWatch Logs | pennies at demo volume |
 | CloudWatch alarms (3) + SNS email | $0 (first 10 alarms and 1,000 emails are free) |
-| **Total** | **~$0.10** |
+| **Total** | **~$0.05** |
 
 The free tier absorbs ~130,000 queries a month before Lambda bills anything.
 `reserved_concurrency` is the guard that matters: it caps what a reachable URL
@@ -94,7 +92,9 @@ can spend even if someone finds it.
      --type SecureString --value file://secret.json --overwrite
    ```
 
-   Leave `OLLAMA_API_KEY` as `""` when the endpoint needs no token. The app
+   Use a **read-only** Qdrant key here: the function only searches, and
+   indexing runs elsewhere with a read-write key. Leave `OLLAMA_API_KEY` as
+   `""` when the endpoint needs no token. The app
    reads the parameter through `APP_SECRET_PARAMETER`, which is already in
    the function's environment.
 6. Set the deploy workflow's repository variables from the outputs:

@@ -137,8 +137,12 @@ prompt tokens per question.
 Read it with its limits: 20 questions over 6 short documents, and the judge is
 the same model that answers. The first judge prompt also failed a correct
 answer for being in the wrong language; it now grades facts only, and that
-answer ("12 months", given in Spanish to an English question) shows the chain
-can still slip on the reply language.
+answer ("12 months", given in Spanish to an English question) exposed a real
+slip: over Spanish passages the model followed the passages' language in 6 of
+12 English replies. The prompt now names the reply language
+(`chain.question_language`, Spanish or English), which gave 18/18; a rerun
+keeps the RAG at 100% correct and 0% hallucinated (p95 1.35 s), while the model
+alone moved to 25% correct and 10% hallucinated, so read its column as a range.
 
 ## Failure behaviour
 
@@ -158,8 +162,10 @@ HTTPS and a public hostname with no load balancer, and no bill while nobody
 asks anything. The image is built from `docker/Dockerfile` and pushed to ECR;
 the Lambda Web Adapter inside it serves the same FastAPI app that runs locally.
 
-The corpus lives in S3 and the credentials in an SSM SecureString, to be read by
-the function role (F3) — not injected as environment variables. `reserved_concurrency`
+The credentials live in an SSM SecureString that the function reads at
+startup, not in environment variables. The corpus is indexed from wherever it
+sits (`scripts/index_docs.py <dir>`); the function never reads documents, only
+Qdrant. `reserved_concurrency`
 caps how much a reachable URL can spend.
 
 The Streamlit UI cannot run on Lambda: it needs a long-lived websocket
