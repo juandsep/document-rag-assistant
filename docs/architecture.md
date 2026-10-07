@@ -36,11 +36,17 @@ everything through. The model judges sufficiency instead.
 ## Indexing
 
 ```
-documents ──▶ load ──▶ chunk ──▶ embed ──▶ upsert (index vN)
+.txt .md .pdf .docx ──▶ load (pages) ──▶ clean ──▶ chunk ──▶ dedupe ──▶ upsert (index vN)
 ```
 
-Chunking is a sliding window (`ingest.chunk_text`) so adjacent passages overlap
-and a fact split across a boundary is still retrievable.
+`ingest.load_pages` reads plain text and Markdown whole, PDFs page by page
+(the page number travels with each chunk, so answers can cite it) and DOCX
+paragraphs plus tables. Cleaning rejoins words hyphenated across PDF lines and
+collapses whitespace. Chunking is a sliding window (`ingest.chunk_text`, 800
+characters, 100 of overlap) so a fact split across a boundary is still
+retrievable. `scripts/index_docs.py` drops chunks whose text already appeared,
+so a copied document or repeated boilerplate is indexed once. A document's id
+is its path relative to the corpus root.
 
 Reindexing writes a **new** index version and never overwrites an older one:
 a `document-rag-v<UTC timestamp>` collection in Qdrant, a `vN.json` file

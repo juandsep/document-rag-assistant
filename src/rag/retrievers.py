@@ -32,6 +32,7 @@ class Retrieved:
     doc_id: str
     text: str
     score: float
+    page: int | None = None
 
 
 class Retriever(Protocol):
@@ -69,7 +70,7 @@ class LocalRetriever:
     def upsert(self, chunks: list[Chunk]) -> str:
         vectors = self.embed([chunk.text for chunk in chunks]) if chunks else []
         rows = [
-            {"doc_id": c.doc_id, "index": c.index, "text": c.text, "vector": v}
+            {"doc_id": c.doc_id, "page": c.page, "text": c.text, "vector": v}
             for c, v in zip(chunks, vectors, strict=True)
         ]
         versions = self._versions()
@@ -92,7 +93,9 @@ class LocalRetriever:
         # move to a real backend when queries get slow.
         scored = sorted(
             (
-                Retrieved(r["doc_id"], r["text"], _cosine(vector, r["vector"]))
+                Retrieved(
+                    r["doc_id"], r["text"], _cosine(vector, r["vector"]), r.get("page")
+                )
                 for r in rows
             ),
             key=lambda hit: hit.score,
@@ -154,7 +157,7 @@ class QdrantRetriever:
                 id=str(uuid.uuid5(uuid.NAMESPACE_URL, f"{c.doc_id}#{c.index}")),
                 # e5 models are trained with these prefixes on each side.
                 vector=self._document(f"passage: {c.text}"),
-                payload={"doc_id": c.doc_id, "text": c.text},
+                payload={"doc_id": c.doc_id, "page": c.page, "text": c.text},
             )
             for c in chunks
         ]
@@ -198,7 +201,9 @@ class QdrantRetriever:
             with_payload=True,
         )
         return [
-            Retrieved(p.payload["doc_id"], p.payload["text"], p.score)
+            Retrieved(
+                p.payload["doc_id"], p.payload["text"], p.score, p.payload.get("page")
+            )
             for p in response.points
         ]
 

@@ -54,7 +54,7 @@ uv sync
 uv run pytest -q
 uv run ruff check . && uv run ruff format --check .
 uv run rag                                        # API on http://localhost:8000
-uv run python scripts/index_docs.py <corpus-dir>
+uv run --env-file .env python scripts/index_docs.py <corpus-dir>   # .txt .md .pdf .docx
 uv run streamlit run src/rag/ui.py
 ```
 

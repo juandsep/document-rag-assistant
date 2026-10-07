@@ -1,32 +1,50 @@
-"""Initial indexing of the document corpus into the vector store.
+"""Index a document corpus into the vector store as a new version.
 
 Usage:
-    uv run python scripts/index_docs.py ./docs
+    uv run --env-file .env python scripts/index_docs.py <corpus-dir>
 
-Walks the documents, applies the sliding-window chunking and upserts the
-embeddings into the backend selected by VECTOR_BACKEND. Every run writes a new
-index version; it never overwrites a serving index.
+Walks the directory for .txt, .md, .pdf and .docx files, cleans and chunks
+them, drops chunks whose text already appeared (copies of the same document,
+repeated boilerplate), and upserts the rest into the backend selected by
+VECTOR_BACKEND. Every run writes a new index version; it never overwrites a
+serving one. A document's id is its path relative to the corpus directory.
 """
 
 from __future__ import annotations
 
+import hashlib
 import sys
 from pathlib import Path
 
-from rag.ingest import chunk_text, load_document
+from rag.ingest import SUPPORTED, chunk_document
 from rag.retrievers import get_retriever
 
 
 def main(root: str) -> None:
-    """Chunk every file under `root` and upsert them as one index version."""
-    files = [path for path in Path(root).rglob("*") if path.is_file()]
-    chunks = []
+    """Chunk every supported file under `root` and upsert them as one version."""
+    base = Path(root)
+    files = sorted(p for p in base.rglob("*") if p.is_file())
+    chunks, seen, duplicates = [], set(), 0
     for path in files:
-        doc_chunks = chunk_text(load_document(str(path)), doc_id=path.name)
-        chunks.extend(doc_chunks)
-        print(f"{path.name}: {len(doc_chunks)} chunks")
+        if path.suffix.lower() not in SUPPORTED:
+            print(f"skipped {path.relative_to(base)}: unsupported format")
+            continue
+        doc_id = path.relative_to(base).as_posix()
+        kept = 0
+        for chunk in chunk_document(path, doc_id):
+            digest = hashlib.sha256(chunk.text.casefold().encode()).hexdigest()
+            if digest in seen:
+                duplicates += 1
+                continue
+            seen.add(digest)
+            chunks.append(chunk)
+            kept += 1
+        print(f"{doc_id}: {kept} chunks")
+    if not chunks:
+        sys.exit(f"No indexable text under {base}")
     version = get_retriever().upsert(chunks)
-    print(f"total chunks: {len(chunks)} -> index version {version}")
+    print(f"total chunks: {len(chunks)} ({duplicates} duplicates dropped)")
+    print(f"index version: {version}")
 
 
 if __name__ == "__main__":

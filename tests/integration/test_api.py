@@ -56,6 +56,7 @@ def test_query_answers_with_its_sources_and_logs_one_line(wired, capsys):
                 "doc_id": "refunds.txt",
                 "text": "Refunds are accepted for 30 days.",
                 "score": 0.87,
+                "page": None,
             }
         ],
         "status": "ok",

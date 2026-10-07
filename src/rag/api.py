@@ -74,6 +74,7 @@ class Source(BaseModel):
     doc_id: str
     text: str
     score: float
+    page: int | None = None
 
 
 class QueryResponse(BaseModel):
@@ -128,7 +129,8 @@ def query(payload: QueryRequest) -> QueryResponse:
     return QueryResponse(
         answer=result.text,
         sources=[
-            Source(doc_id=s.doc_id, text=s.text, score=s.score) for s in result.sources
+            Source(doc_id=s.doc_id, text=s.text, score=s.score, page=s.page)
+            for s in result.sources
         ],
         status=result.status,
     )

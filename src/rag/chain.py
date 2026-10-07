@@ -81,7 +81,8 @@ def ollama_chat(messages: list[dict[str, str]]) -> Reply:
 
 def _prompt(question: str, passages: list[Retrieved]) -> list[dict[str, str]]:
     context = "\n\n".join(
-        f"[{n}] ({p.doc_id}) {p.text}" for n, p in enumerate(passages, start=1)
+        f"[{n}] ({p.doc_id}{f', p. {p.page}' if p.page else ''}) {p.text}"
+        for n, p in enumerate(passages, start=1)
     )
     return [
         {"role": "system", "content": SYSTEM_PROMPT},
