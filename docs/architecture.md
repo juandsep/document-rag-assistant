@@ -101,6 +101,11 @@ MLFLOW_TRACKING_TOKEN=$(gcloud auth print-identity-token) \
 uv run --env-file .env python scripts/evaluate.py --version <version> --chain --promote
 ```
 
+In CI, `.github/workflows/eval.yml` runs the same evaluation (`--chain`, k =
+3) on every pull request that touches the chain, the retrievers, ingestion or
+the eval set, against the serving index, and fails the check below recall@3
+0.8 or 0.9 right decisions.
+
 First run (k = 3, `gpt-oss:120b`): recall@3 0.94, hit rate@3 0.94, MRR 0.81,
 precision@3 0.31 (the ceiling is 0.33: one relevant document per question),
 answer decisions 19/20 right, latency p50 1.07 s and p95 1.65 s.
