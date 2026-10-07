@@ -18,7 +18,9 @@ def log_query(**fields: Any) -> None:
     print(json.dumps({"event": "rag_query", **fields}), file=sys.stdout, flush=True)
 
 
-def log_evaluation(metrics: dict[str, float], params: dict[str, Any]) -> bool:
+def log_evaluation(
+    metrics: dict[str, float], params: dict[str, Any], run_name: str = "retrieval-eval"
+) -> bool:
     """Record an offline evaluation run in MLflow, if it is installed.
 
     Returns False when MLflow is missing (the image ships without it), so the
@@ -29,7 +31,7 @@ def log_evaluation(metrics: dict[str, float], params: dict[str, Any]) -> bool:
     except ImportError:
         return False
     mlflow.set_experiment("document-rag-assistant")
-    with mlflow.start_run(run_name="retrieval-eval"):
+    with mlflow.start_run(run_name=run_name):
         mlflow.log_params(params)
         mlflow.log_metrics({k: float(v) for k, v in metrics.items()})
     return True
