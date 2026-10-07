@@ -97,8 +97,17 @@ can spend even if someone finds it.
    Leave `OLLAMA_API_KEY` as `""` when the endpoint needs no token. The app
    reads the parameter through `APP_SECRET_PARAMETER`, which is already in
    the function's environment.
-6. Take `deploy_role_arn` from the outputs and set it as the
-   `AWS_DEPLOY_ROLE` repository variable for the deploy workflow.
+6. Set the deploy workflow's repository variables from the outputs:
+
+   ```bash
+   gh variable set AWS_DEPLOY_ROLE --body "$(terraform output -raw deploy_role_arn)"
+   gh variable set ECR_REPOSITORY  --body "$(terraform output -raw ecr_repository_url)"
+   gh variable set LAMBDA_FUNCTION --body "$(terraform output -raw function_name)"
+   gh variable set FUNCTION_URL    --body "$(terraform output -raw function_url)"
+   ```
+
+   From then on every push to `dev` builds the image, pushes it to ECR, rolls
+   it out and checks `/health` (`.github/workflows/deploy.yml`).
 7. `image_tag` must exist in ECR before the function can start: `bootstrap` is
    only there so the first apply has something to point at.
 
