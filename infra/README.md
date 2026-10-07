@@ -94,7 +94,9 @@ can spend even if someone finds it.
      --type SecureString --value file://secret.json --overwrite
    ```
 
-   Leave `OLLAMA_API_KEY` as `""` when the endpoint needs no token. The app
+   Use a **read-only** Qdrant key here: the function only searches, and
+   indexing runs elsewhere with a read-write key. Leave `OLLAMA_API_KEY` as
+   `""` when the endpoint needs no token. The app
    reads the parameter through `APP_SECRET_PARAMETER`, which is already in
    the function's environment.
 6. Set the deploy workflow's repository variables from the outputs:
