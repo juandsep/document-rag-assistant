@@ -13,8 +13,11 @@ from them, and returns them as sources. Every change to chunking, embeddings or
 the retriever is measured with precision@k / recall@k instead of guessed. It
 runs on AWS for about $0.10/month idle, plus LLM tokens.
 
-> **Live on AWS** (Lambda, `us-east-1`); the API needs an `X-API-Key`. The
-> public Streamlit UI is next. Status and decisions: [PLAN.md](PLAN.md).
+**[Try the live demo →](https://document-rag-assistant-portfolio.streamlit.app/)**
+Ask about the returns, shipping, warranty, support, payments or privacy policy
+of Norte Retail, a fictional store, in Spanish or English. The API runs on AWS
+Lambda; the first question after a quiet spell waits a few seconds for it to
+wake up. Status and decisions: [PLAN.md](PLAN.md).
 
 ## How it works
 
