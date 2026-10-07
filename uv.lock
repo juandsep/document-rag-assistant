@@ -3243,7 +3243,6 @@ source = { editable = "." }
 dependencies = [
     { name = "boto3" },
     { name = "fastapi" },
-    { name = "qdrant-client" },
     { name = "uvicorn" },
 ]
 
@@ -3260,6 +3259,7 @@ eval = [
 ingest = [
     { name = "pypdf" },
     { name = "python-docx" },
+    { name = "qdrant-client" },
 ]
 ui = [
     { name = "streamlit" },
@@ -3269,7 +3269,6 @@ ui = [
 requires-dist = [
     { name = "boto3", specifier = ">=1.43.108" },
     { name = "fastapi", specifier = ">=0.142.0" },
-    { name = "qdrant-client", specifier = ">=1.19.1" },
     { name = "uvicorn", specifier = ">=0.54.0" },
 ]
 
@@ -3284,6 +3283,7 @@ eval = [{ name = "mlflow", specifier = ">=3.16.1" }]
 ingest = [
     { name = "pypdf", specifier = ">=6.19.0" },
     { name = "python-docx", specifier = ">=1.2.0" },
+    { name = "qdrant-client", specifier = ">=1.19.1" },
 ]
 ui = [{ name = "streamlit", specifier = ">=1.65.0" }]
 
