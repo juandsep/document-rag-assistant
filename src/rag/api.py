@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import functools
+import hmac
 import json
 import os
 import time
@@ -10,7 +11,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException
 from pydantic import BaseModel, Field
 
 from rag import chain, monitoring
@@ -46,6 +47,23 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     except Exception as exc:  # noqa: BLE001 - a missing config fails on /query
         print(f"retriever warm-up skipped: {exc!r}", flush=True)
     yield
+
+
+def require_api_key(x_api_key: str | None = Header(default=None)) -> None:
+    """Gate /query behind the `API_KEY` secret when one is configured.
+
+    The Function URL is public so a browser-hosted UI can call it; the key
+    keeps strangers from spending model time. Local runs without `API_KEY`
+    stay open, but a deployed function without one refuses rather than
+    serving the world.
+    """
+    expected = os.getenv("API_KEY")
+    if not expected:
+        if os.getenv("APP_SECRET_PARAMETER"):
+            raise HTTPException(503, "The API key is not configured.")
+        return
+    if not (x_api_key and hmac.compare_digest(x_api_key, expected)):
+        raise HTTPException(401, "Missing or wrong X-API-Key header.")
 
 
 def _ms(started: float) -> float:
@@ -94,7 +112,9 @@ async def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
-@app.post("/query", response_model=QueryResponse)
+@app.post(
+    "/query", response_model=QueryResponse, dependencies=[Depends(require_api_key)]
+)
 def query(payload: QueryRequest) -> QueryResponse:
     """Answer `payload.q` from the indexed corpus, citing the sources.
 

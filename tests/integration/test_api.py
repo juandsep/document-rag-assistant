@@ -75,3 +75,22 @@ def test_query_rejects_an_empty_question():
 
 def test_query_rejects_an_out_of_range_top_k():
     assert client.post("/query", json={"q": "hi", "top_k": 0}).status_code == 422
+
+
+def test_query_demands_the_api_key_when_one_is_set(wired, monkeypatch):
+    wired(FakeRetriever())
+    monkeypatch.setenv("API_KEY", "s3cret")
+
+    assert client.post("/query", json={"q": "hi"}).status_code == 401
+    wrong = {"X-API-Key": "nope"}
+    assert client.post("/query", json={"q": "hi"}, headers=wrong).status_code == 401
+    right = {"X-API-Key": "s3cret"}
+    assert client.post("/query", json={"q": "hi"}, headers=right).status_code == 200
+    assert client.get("/health").status_code == 200
+
+
+def test_a_deployed_function_without_a_key_refuses(wired, monkeypatch):
+    wired(FakeRetriever())
+    monkeypatch.delenv("API_KEY", raising=False)
+    monkeypatch.setenv("APP_SECRET_PARAMETER", "/rag/app")
+    assert client.post("/query", json={"q": "hi"}).status_code == 503
