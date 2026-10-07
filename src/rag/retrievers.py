@@ -14,7 +14,6 @@ import json
 import math
 import os
 import re
-import urllib.request
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -22,6 +21,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Protocol
 
+from rag import ollama
 from rag.ingest import Chunk
 
 Embedder = Callable[[list[str]], list[list[float]]]
@@ -42,16 +42,8 @@ class Retriever(Protocol):
 
 def ollama_embed(texts: list[str]) -> list[list[float]]:
     """Embed `texts` with `EMBEDDING_MODEL` through Ollama's `/api/embed`."""
-    base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
-    headers = {"Content-Type": "application/json"}
-    if api_key := os.getenv("OLLAMA_API_KEY"):
-        headers["Authorization"] = f"Bearer {api_key}"
-    body = {"model": os.getenv("EMBEDDING_MODEL", "nomic-embed-text"), "input": texts}
-    request = urllib.request.Request(
-        f"{base_url}/api/embed", data=json.dumps(body).encode(), headers=headers
-    )
-    with urllib.request.urlopen(request, timeout=60) as response:
-        return json.load(response)["embeddings"]
+    model = os.getenv("EMBEDDING_MODEL", "nomic-embed-text")
+    return ollama.post("/api/embed", {"model": model, "input": texts})["embeddings"]
 
 
 def _cosine(a: list[float], b: list[float]) -> float:

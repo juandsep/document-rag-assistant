@@ -12,7 +12,7 @@ POST /query { q }
   embed(q) ──▶ Vector DB (Qdrant / local) ──▶ top-k chunks
       │
       ▼
-  prompt(chunks, q) ──▶ LLM ──▶ answer + cited sources
+  prompt([1]..[k], q) ──▶ LLM (Ollama) ──▶ answer + cited [n] sources
       │
       ▼
   MLflow trace (top-k ids, scores, latency, tokens)
@@ -21,9 +21,17 @@ POST /query { q }
 1. The query is embedded with the same model used at index time — a mismatch
    between the two is the most common cause of silently bad retrieval.
 2. The retriever returns the top-k passages together with their scores.
-3. The prompt is built **only** from those passages; the model is instructed to
-   answer from the context and to say so when the context is insufficient.
-4. The response carries the source chunks, so a reader can verify every claim.
+3. The prompt is built **only** from those passages, numbered `[1]..[k]`; the
+   model cites them as `[n]`, answers in the question's language, and replies
+   `NO_CONTEXT:` with one sentence when they do not hold the answer
+   (`chain.py`).
+4. The response carries the passages the answer cites, so a reader can verify
+   every claim.
+
+There is no fixed similarity threshold: `multilingual-e5-small` puts related
+and unrelated passages within a few hundredths of each other (0.84 against
+0.87 on the test corpus), so a cut-off would either drop good passages or let
+everything through. The model judges sufficiency instead.
 
 ## Indexing
 
@@ -51,14 +59,16 @@ uv run python -c "from rag.retrievers import QdrantRetriever; QdrantRetriever().
 evaluation runs precision@k and recall@k over a labelled question set, which is
 what turns "the answers feel better" into a number attached to a pull request.
 
-## Failure behaviour *(planned)*
+## Failure behaviour
 
 - **Vector DB unavailable** — `/query` fails fast with `503`; answering without
   retrieval would produce uncited claims.
-- **No passages above the similarity threshold** — the service returns "not
-  enough context" rather than letting the model improvise.
-- **LLM unavailable** — the retrieved passages are returned with the error, so
-  the caller still gets the evidence.
+- **Not enough context** — no passages, or the model replies `NO_CONTEXT`: the
+  answer says so in the question's language, with no sources, and `status` is
+  `insufficient_context`, rather than letting
+  the model improvise.
+- **LLM unavailable** — the retrieved passages are returned with the error and
+  `status: llm_unavailable`, so the caller still gets the evidence.
 
 ## Deployment
 

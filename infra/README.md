@@ -71,11 +71,11 @@ can spend even if someone finds it.
    mails a confirmation link for the alarm topic; alarms reach nobody until it
    is clicked. Set `qdrant_url` there too: the Qdrant Cloud cluster URL. Its
    API key goes in the SecureString (step 5), never in a `.tfvars`.
-2. `ollama_base_url` defaults to `http://localhost:11434`, which is only right
-   for a local run: Lambda cannot reach a laptop. It has to point at an endpoint
-   reachable from the internet, and that endpoint should require a token
-   (`OLLAMA_API_KEY`), because an open Ollama server is an open proxy to the
-   hardware it runs on.
+2. `ollama_base_url` defaults to Ollama Cloud (`https://ollama.com`) and
+   `ollama_model` to `gpt-oss:120b`. The Ollama Cloud key goes in the
+   SecureString as `OLLAMA_API_KEY` (step 5). A self-hosted Ollama works too, as
+   long as Lambda can reach it and it asks for a token: an open Ollama server is
+   an open proxy to the hardware it runs on.
 3. `function_url_auth_type` defaults to `AWS_IAM`: callers sign with SigV4 and
    nobody can spend model time by accident. Set it to `NONE` only for a public
    demo, and know that the URL then accepts anyone.
@@ -93,7 +93,7 @@ can spend even if someone finds it.
    ```
 
    Leave `OLLAMA_API_KEY` as `""` when the endpoint needs no token. The app
-   will read the parameter through `APP_SECRET_PARAMETER`, which is already in
+   reads the parameter through `APP_SECRET_PARAMETER`, which is already in
    the function's environment.
 6. Take `deploy_role_arn` from the outputs and set it as the
    `AWS_DEPLOY_ROLE` repository variable for the deploy workflow.
@@ -122,9 +122,9 @@ git-ignored `.env`.
 | `QDRANT_URL` / `QDRANT_API_KEY` | Qdrant Cloud cluster and its key |
 | `QDRANT_ALIAS` | alias queries go through (default `document-rag`) |
 | `MLFLOW_TRACKING_URI` | tracking backend |
-| `OLLAMA_BASE_URL` / `OLLAMA_MODEL` / `OLLAMA_API_KEY` | Ollama endpoint, generation model and bearer token |
+| `OLLAMA_BASE_URL` / `OLLAMA_MODEL` / `OLLAMA_API_KEY` | Ollama endpoint (local default `http://localhost:11434`, deployed `https://ollama.com`), generation model (default `gpt-oss:120b`) and bearer token |
 | `EMBEDDING_MODEL` | embedding model the `local` backend asks Ollama for |
-| `APP_SECRET_PARAMETER` | SecureString the function will read its keys from (not read yet, see F3) |
+| `APP_SECRET_PARAMETER` | SecureString whose JSON keys the API copies into its environment at startup (Lambda only; local runs use `.env`) |
 | `RAG_API_URL` | API base URL consumed by the UI |
 
 ## Conventions

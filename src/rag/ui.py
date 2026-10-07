@@ -25,12 +25,18 @@ if st.button("Ask") and question:
         response = requests.post(
             f"{API_URL}/query",
             json={"q": question, "top_k": top_k},
-            timeout=30,
+            timeout=60,
         )
         response.raise_for_status()
         payload = response.json()
 
-        st.markdown(payload.get("answer", ""))
+        status = payload.get("status", "ok")
+        if status == "insufficient_context":
+            st.warning(payload.get("answer", ""))
+        elif status == "llm_unavailable":
+            st.error(payload.get("answer", ""))
+        else:
+            st.markdown(payload.get("answer", ""))
         sources = payload.get("sources") or []
         if sources:
             with st.expander(f"Sources ({len(sources)})"):
@@ -40,6 +46,6 @@ if st.button("Ask") and question:
                         f"{source['text']}"
                     )
         else:
-            st.info("No sources above the similarity threshold.")
+            st.info("No passages were retrieved for this question.")
     except Exception as exc:  # noqa: BLE001 - surface any failure to the operator
         st.error(f"Query failed: {exc}")
