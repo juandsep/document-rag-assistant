@@ -21,7 +21,7 @@ def test_unanswerable_questions_need_no_judge():
 
 
 def test_answerable_questions_go_to_the_judge_unless_refused(monkeypatch):
-    monkeypatch.setattr(compare, "judge", lambda q, ref, ans: "correct")
+    monkeypatch.setattr(compare, "judge", lambda q, ref, ans, chat=None: "correct")
     assert compare.verdict(ANSWERABLE, "30 days.", refused=False) == "correct"
     assert compare.verdict(ANSWERABLE, "", refused=True) == "refused"
 
@@ -54,3 +54,25 @@ def test_summarize_rates():
     assert summary["refusal_rate_answerable"] == 0.5
     assert summary["abstention_unanswerable"] == 0.5
     assert summary["hallucination_rate"] == 0.25
+
+
+def test_the_judge_is_deepseek_when_keyed_and_self_otherwise(monkeypatch, capsys):
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "k")
+    monkeypatch.delenv("DEEPSEEK_MODEL", raising=False)
+    assert compare.judge_chat() == (compare.deepseek_chat, "deepseek-flash")
+
+    monkeypatch.delenv("DEEPSEEK_API_KEY")
+    chat, _ = compare.judge_chat()
+    assert chat is compare.chain.ollama_chat
+    assert "judges itself" in capsys.readouterr().out
+
+
+def test_judge_uses_the_chat_it_is_given():
+    seen = []
+
+    def chat(messages):
+        seen.append(messages)
+        return compare.chain.Reply("correct")
+
+    assert compare.judge("q", "ref", "ans", chat) == "correct"
+    assert "Reference: ref" in seen[0][1]["content"]

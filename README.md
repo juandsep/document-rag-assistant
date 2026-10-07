@@ -20,14 +20,15 @@ A language model answering alone knows nothing about one company's policies,
 so it either refuses or guesses, and a guess reads exactly like a fact. This
 service retrieves the relevant passages first, lets the model answer only from
 them and returns them as sources, so every claim can be checked. On the
-labelled question set, the same model ([details](docs/architecture.md#rag-against-the-model-alone)):
+labelled question set, the same model, graded by an independent judge
+(DeepSeek) ([details](docs/architecture.md#rag-against-the-model-alone)):
 
-| `gpt-oss:120b`, 56 questions | With retrieval | Alone |
+| `gpt-oss:120b`, 56 questions, independent judge | With retrieval | Alone |
 |---|---|---|
-| Correct answers | **100%** | 19% |
-| Hallucinated answers | **0%** | 5% |
-| Refused although answerable | **0%** | 75% |
-| Latency p50 | 1.32 s | 0.94 s |
+| Correct answers | **100%** | 17% |
+| Hallucinated answers | **0%** | 11% |
+| Refused although answerable | **0%** | 70% |
+| Latency p50 | 1.35 s | 1.00 s |
 
 ## How it works
 

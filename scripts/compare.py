@@ -11,8 +11,11 @@ the questions the corpus cannot answer, refusing is the right outcome and any
 answer is a hallucination.
 
 Both runs go to MLflow when MLFLOW_TRACKING_URI is set (see evaluate.py).
-The judge is the same model family it grades, which flatters neither side
-more than the other but is still a bias: read the per-question verdicts.
+
+The judge is independent of the model it grades: DeepSeek's API
+(`DEEPSEEK_MODEL`, default `deepseek-flash`) when DEEPSEEK_API_KEY is set.
+Without the key it falls back to the answering model grading itself, and
+says so, because that is a bias: read the per-question verdicts then.
 """
 
 from __future__ import annotations
@@ -21,6 +24,7 @@ import argparse
 import json
 import os
 import time
+import urllib.request
 from collections.abc import Callable
 from pathlib import Path
 
@@ -59,9 +63,47 @@ def with_model(model: str | None, call: Callable[[], chain.Reply]) -> chain.Repl
             os.environ["OLLAMA_MODEL"] = previous
 
 
-def judge(question: str, reference: str, answer: str) -> str:
-    """correct | incorrect | refused, as graded by the LLM."""
-    reply = chain.ollama_chat(
+def deepseek_chat(messages: list[dict[str, str]]) -> chain.Reply:
+    """One chat turn with DeepSeek's OpenAI-compatible API, temperature 0."""
+    body = {
+        "model": os.getenv("DEEPSEEK_MODEL", "deepseek-flash"),
+        "messages": messages,
+        "temperature": 0,
+    }
+    request = urllib.request.Request(
+        "https://api.deepseek.com/chat/completions",
+        data=json.dumps(body).encode(),
+        headers={
+            "Authorization": f"Bearer {os.environ['DEEPSEEK_API_KEY']}",
+            "Content-Type": "application/json",
+        },
+    )
+    with urllib.request.urlopen(request, timeout=60) as response:
+        payload = json.load(response)
+    usage = payload.get("usage", {})
+    return chain.Reply(
+        payload["choices"][0]["message"]["content"],
+        usage.get("prompt_tokens", 0),
+        usage.get("completion_tokens", 0),
+    )
+
+
+def judge_chat() -> tuple[Callable[[list[dict[str, str]]], chain.Reply], str]:
+    """The judge and its name: DeepSeek when keyed, else the answering model."""
+    if os.getenv("DEEPSEEK_API_KEY"):
+        return deepseek_chat, os.getenv("DEEPSEEK_MODEL", "deepseek-flash")
+    print("warning: DEEPSEEK_API_KEY unset; the answering model judges itself")
+    return chain.ollama_chat, os.getenv("OLLAMA_MODEL", "gpt-oss:120b")
+
+
+def judge(
+    question: str,
+    reference: str,
+    answer: str,
+    chat: Callable[[list[dict[str, str]]], chain.Reply] | None = None,
+) -> str:
+    """correct | incorrect | refused, as graded by `chat` (the judge)."""
+    reply = (chat or chain.ollama_chat)(
         [
             {"role": "system", "content": JUDGE_PROMPT},
             {
@@ -76,13 +118,13 @@ def judge(question: str, reference: str, answer: str) -> str:
     )
 
 
-def verdict(item: dict, text: str, refused: bool) -> str:
+def verdict(item: dict, text: str, refused: bool, chat=None) -> str:
     """Grade one answer; unanswerable questions need no judge."""
     if not item["relevant"]:
         return "refused" if refused else "hallucinated"
     if refused:
         return "refused"
-    return judge(item["q"], item["answer"], text)
+    return judge(item["q"], item["answer"], text, chat)
 
 
 def summarize(rows: list[dict]) -> dict[str, float]:
@@ -116,6 +158,7 @@ def main() -> None:
 
     questions = [json.loads(line) for line in QUESTIONS.read_text().splitlines()]
     retriever = get_retriever()
+    grader, judge_name = judge_chat()
     runs: dict[str, list[dict]] = {"rag": [], "baseline": []}
 
     for item in questions:
@@ -129,7 +172,7 @@ def main() -> None:
                 "ms": rag_ms,
                 "tokens": result.prompt_tokens,
                 "text": result.text,
-                "verdict": verdict(item, result.text, refused),
+                "verdict": verdict(item, result.text, refused, grader),
             }
         )
 
@@ -152,7 +195,7 @@ def main() -> None:
                 "ms": base_ms,
                 "tokens": reply.prompt_tokens,
                 "text": text,
-                "verdict": verdict(item, text, refused),
+                "verdict": verdict(item, text, refused, grader),
             }
         )
         print(
@@ -176,7 +219,7 @@ def main() -> None:
                 else model,
                 "k": args.k if mode == "rag" else 0,
                 "questions": len(questions),
-                "judge": model,
+                "judge": judge_name,
             }
             log_evaluation(metrics, params, run_name=f"compare-{mode}")
         print("MLflow: logged rag and baseline runs")

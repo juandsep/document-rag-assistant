@@ -168,7 +168,7 @@ with how_tab:
     st.subheader("Does retrieval help?")
     st.markdown(
         "The same model, asked the same 56 labelled questions with and without "
-        "the documents:"
+        "the documents, graded by an independent model (DeepSeek):"
     )
     st.table(
         {
@@ -178,7 +178,7 @@ with how_tab:
                 "Refused although answerable",
             ],
             "With retrieval": ["100%", "0%", "0%"],
-            "Model alone": ["19%", "5%", "75%"],
+            "Model alone": ["17%", "11%", "70%"],
         }
     )
     st.caption(
