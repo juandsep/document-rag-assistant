@@ -8,7 +8,7 @@ Terraform (`aws` `~> 6.0`) provisioning the resources the service needs:
 | Lambda Function URL | HTTPS entry point with no load balancer and no domain of your own |
 | Amazon ECR | image registry CI pushes to |
 | Amazon S3 | document corpus (versioned, encrypted, public access blocked) |
-| SSM Parameter Store (SecureString) | Ollama token, vector store key and MLflow URI |
+| SSM Parameter Store (SecureString) | Qdrant and Ollama Cloud API keys |
 | IAM roles | function role (corpus read + own parameter read) and deploy role (GitHub Actions through OIDC, no stored access keys) |
 | CloudWatch Logs | one log group, 14-day retention |
 | CloudWatch alarms + SNS | errors, throttles and p95 latency, mailed to `alert_email` |
@@ -121,7 +121,7 @@ git-ignored `.env`.
 | `LOCAL_INDEX_DIR` | directory of the `local` index versions (default `index/`) |
 | `QDRANT_URL` / `QDRANT_API_KEY` | Qdrant Cloud cluster and its key |
 | `QDRANT_ALIAS` | alias queries go through (default `document-rag`) |
-| `MLFLOW_TRACKING_URI` | tracking backend |
+| `MLFLOW_TRACKING_URI` / `MLFLOW_TRACKING_TOKEN` | shared MLflow server, for offline evaluation runs only (never set on Lambda) |
 | `OLLAMA_BASE_URL` / `OLLAMA_MODEL` / `OLLAMA_API_KEY` | Ollama endpoint (local default `http://localhost:11434`, deployed `https://ollama.com`), generation model (default `gpt-oss:120b`) and bearer token |
 | `EMBEDDING_MODEL` | embedding model the `local` backend asks Ollama for |
 | `APP_SECRET_PARAMETER` | SecureString whose JSON keys the API copies into its environment at startup (Lambda only; local runs use `.env`) |

@@ -15,7 +15,7 @@ POST /query { q }
   prompt([1]..[k], q) ──▶ LLM (Ollama) ──▶ answer + cited [n] sources
       │
       ▼
-  MLflow trace (top-k ids, scores, latency, tokens)
+  one JSON log line ──▶ CloudWatch Logs ──▶ Grafana (Logs Insights)
 ```
 
 1. The query is embedded with the same model used at index time — a mismatch
@@ -55,9 +55,14 @@ uv run python -c "from rag.retrievers import QdrantRetriever; QdrantRetriever().
 
 ## Evaluation *(planned)*
 
-`monitoring.py` logs per-query traces to MLflow. On top of those, an offline
-evaluation runs precision@k and recall@k over a labelled question set, which is
-what turns "the answers feel better" into a number attached to a pull request.
+Each query writes one `rag_query` JSON line (`monitoring.log_query`): status,
+total, retrieval and generation latency, top score, passages and sources,
+prompt and completion tokens, model. On Lambda it lands in CloudWatch Logs and
+the Grafana dashboard reads it with Logs Insights; nothing on the request path
+calls a metrics service. On top of that, an offline evaluation runs
+precision@k and recall@k over a labelled question set and records the run in
+the shared MLflow, which is what turns "the answers feel better" into a number
+attached to a pull request.
 
 ## Failure behaviour
 

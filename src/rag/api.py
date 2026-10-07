@@ -5,6 +5,7 @@ from __future__ import annotations
 import functools
 import json
 import os
+import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
@@ -12,7 +13,7 @@ from typing import Any
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
-from rag import chain
+from rag import chain, monitoring
 from rag.retrievers import Retriever, get_retriever
 
 
@@ -38,7 +39,17 @@ def load_secrets(ssm: Any = None) -> None:
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     load_secrets()
+    # Importing qdrant_client takes ~2.5 s. Paying it here, before /health
+    # answers and Lambda routes traffic, keeps it off the first query.
+    try:
+        getattr(_retriever(), "client", None)
+    except Exception as exc:  # noqa: BLE001 - a missing config fails on /query
+        print(f"retriever warm-up skipped: {exc!r}", flush=True)
     yield
+
+
+def _ms(started: float) -> float:
+    return round((time.perf_counter() - started) * 1000, 1)
 
 
 @functools.cache
@@ -89,6 +100,7 @@ def query(payload: QueryRequest) -> QueryResponse:
     A sync handler on purpose: retrieval and generation block on HTTP, so
     FastAPI runs it in its threadpool instead of stalling the event loop.
     """
+    started = time.perf_counter()
     try:
         result = chain.answer(
             payload.q,
@@ -97,8 +109,22 @@ def query(payload: QueryRequest) -> QueryResponse:
             chat=chain.ollama_chat,
         )
     except chain.RetrievalError as exc:
+        monitoring.log_query(status="retrieval_error", latency_ms=_ms(started))
         # Answering without retrieval would produce uncited claims.
         raise HTTPException(503, "The vector store is unavailable.") from exc
+    monitoring.log_query(
+        status=result.status,
+        latency_ms=_ms(started),
+        retrieval_ms=round(result.retrieval_ms, 1),
+        generation_ms=round(result.generation_ms, 1),
+        top_k=payload.top_k,
+        top_score=round(max((p.score for p in result.passages), default=0.0), 4),
+        passages=len(result.passages),
+        sources=len(result.sources),
+        prompt_tokens=result.prompt_tokens,
+        completion_tokens=result.completion_tokens,
+        model=os.getenv("OLLAMA_MODEL", "gpt-oss:120b"),
+    )
     return QueryResponse(
         answer=result.text,
         sources=[
