@@ -1,0 +1,66 @@
+# Offline evaluation as a merge gate: any pull request that touches how the
+# service retrieves, prompts or answers runs scripts/evaluate.py --chain on
+# the labelled questions against the index that is serving, and fails when
+# recall@3 drops under 0.8 or right answer/refuse decisions under 0.9. The
+# metrics land in the job summary. Changes to chunking only take effect after
+# a reindex, so they are measured against the serving index until then.
+#
+# Needs the QDRANT_URL variable, and the QDRANT_API_KEY (read-only) and
+# OLLAMA_API_KEY secrets; skips while any is missing (forks never get them).
+name: eval
+
+on:
+  pull_request:
+    branches: [dev, main]
+    paths:
+      - "src/rag/chain.py"
+      - "src/rag/retrievers.py"
+      - "src/rag/ollama.py"
+      - "src/rag/ingest.py"
+      - "eval/**"
+      - "scripts/evaluate.py"
+      - ".github/workflows/eval.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # Ollama Cloud's free plan serves one request at a time.
+  group: eval
+  cancel-in-progress: false
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      VECTOR_BACKEND: qdrant
+      QDRANT_URL: ${{ vars.QDRANT_URL }}
+      QDRANT_API_KEY: ${{ secrets.QDRANT_API_KEY }}
+      OLLAMA_BASE_URL: https://ollama.com
+      OLLAMA_API_KEY: ${{ secrets.OLLAMA_API_KEY }}
+    steps:
+      - name: Preflight
+        id: preflight
+        run: |
+          if [ -z "$QDRANT_URL" ] || [ -z "$QDRANT_API_KEY" ] || [ -z "$OLLAMA_API_KEY" ]; then
+            echo "::notice::QDRANT_URL, QDRANT_API_KEY or OLLAMA_API_KEY missing; skipping."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        if: steps.preflight.outputs.ready == 'true'
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        if: steps.preflight.outputs.ready == 'true'
+        with:
+          python-version: '3.11'
+      - name: Install uv and dependencies
+        if: steps.preflight.outputs.ready == 'true'
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          uv sync --locked --no-default-groups
+      - name: Evaluate retrieval and answers
+        if: steps.preflight.outputs.ready == 'true'
+        run: uv run python scripts/evaluate.py --chain --k 3 --min-recall 0.8 --min-decisions 0.9

@@ -56,9 +56,12 @@ first, then rewrite history. Deleting the commit is not enough.
 
 ## Retrieval and prompt changes
 
-- Every change to chunking, embeddings, the retriever or the prompt ships with
-  the output of `scripts/evaluate.py --chain` (see `docs/architecture.md`)
-  attached to the pull request, and the MLflow run link.
+- Every change to chunking, embeddings, the retriever or the prompt is gated by
+  `.github/workflows/eval.yml`: it runs `scripts/evaluate.py --chain` on the
+  pull request and fails it when recall@3 drops under 0.8 or right
+  answer/refuse decisions under 0.9; the metrics are in the job summary. For a
+  change that needs a reindex, attach a run on the new version
+  (`evaluate.py --version <v> --chain`) and its MLflow link.
 - Answers must keep citing their sources; a change that drops citations is a
   regression, not a simplification.
 - Reindexing is idempotent and versioned: a new corpus version gets a new index,
