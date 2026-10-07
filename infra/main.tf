@@ -46,7 +46,7 @@ variable "environment" {
 }
 
 variable "image_tag" {
-  description = "Tag of the image the function runs. CI rewrites it on every deploy; `bootstrap` before the first one."
+  description = "Image tag for the first apply only (`bootstrap`). deploy.yml rolls out every later image, and the function ignores this after creation."
   type        = string
   default     = "bootstrap"
 }
