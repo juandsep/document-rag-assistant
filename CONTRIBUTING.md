@@ -56,9 +56,9 @@ first, then rewrite history. Deleting the commit is not enough.
 
 ## Retrieval and prompt changes
 
-- Once the offline evaluation exists (F5), every change to chunking, embeddings,
-  the retriever or the prompt ships with its precision@k / recall@k attached to
-  the pull request.
+- Every change to chunking, embeddings, the retriever or the prompt ships with
+  the output of `scripts/evaluate.py --chain` (see `docs/architecture.md`)
+  attached to the pull request, and the MLflow run link.
 - Answers must keep citing their sources; a change that drops citations is a
   regression, not a simplification.
 - Reindexing is idempotent and versioned: a new corpus version gets a new index,

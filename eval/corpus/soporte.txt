@@ -1,0 +1,7 @@
+Customer support
+
+Norte Retail's support team answers by chat and email Monday to Friday from 8:00 to 18:00 and Saturdays from 9:00 to 13:00 (Bogotá time). There is no support on Sundays or public holidays.
+
+The phone line, +57 601 555 0100, is only for orders above 2,000,000 COP and business customers. Every other customer should use the chat inside the app or write to soporte@norteretail.example.
+
+The target first response time is 2 hours on chat and 24 hours on email during business hours. Complaints that are not solved within 15 business days can be escalated to the customer ombudsman.

@@ -1,0 +1,7 @@
+Privacy and personal data
+
+Norte Retail stores customers' personal data in servers located in the United States and keeps it for as long as the account is active plus 5 years, as required by tax law.
+
+Customers can ask to access, correct or delete their data by writing to privacidad@norteretail.example. Requests are answered within 10 business days. Deleting the account does not delete invoices, which must be kept for tax purposes.
+
+Norte Retail does not sell personal data. It shares it only with the payment processor and the delivery company, and only the data each one needs to complete the order.
