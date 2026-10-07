@@ -14,7 +14,7 @@ Each phase is one short-lived branch cut from `dev`, one pull request, one conce
 - [x] **F3 · RAG chain** — `chain.py`: retrieve top-k, prompt with the numbered passages only, generate with Ollama (`OLLAMA_MODEL`, temperature 0), return the passages the answer cites as `[n]`. The model replies `NO_CONTEXT:` plus one sentence in the question's language when the passages do not hold the answer, which becomes `status: insufficient_context` with no sources instead of an improvised answer. Replies follow the question's language even when the passages are in another one. On Lambda the API copies the SecureString named by `APP_SECRET_PARAMETER` into its environment at startup.
 - [x] **F4 · API** — `POST /query` answers through the chain with its sources and a `status` (`ok`, `insufficient_context`, `llm_unavailable`); a vector-store outage returns `503`. `GET /health` stays dependency-free for the readiness check.
 - [x] **F5 · Monitoring** — CloudWatch alarms (`infra/monitoring.tf`); one `rag_query` JSON line per query (status, latency by stage, top score, tokens, model); the Grafana dashboard with Lambda, spend and per-query Logs Insights panels (untested against real CloudWatch data until the first deploy); `scripts/evaluate.py` scoring retrieval and answers on `eval/`, logged to the shared MLflow and gating `promote`. First run: recall@3 0.94, MRR 0.81, 19/20 answer decisions, p95 1.65 s.
-- [~] **F6 · UI** — `ui.py`: example questions about the demo corpus, answers with their status (warning on a refusal), sources with document, page and score, and the `X-API-Key` header. Tested headless with Streamlit's AppTest. Hosted on Streamlit Community Cloud (free; Hugging Face now charges for Streamlit-capable Spaces) from `main`, with `src/rag/requirements.txt` as its dependency file. Not yet: the Community Cloud app itself, which needs the deployed API URL and a one-time setup in its web console.
+- [x] **F6 · UI** — `ui.py`: example questions about the demo corpus, answers with their status (warning on a refusal), sources with document, page and score, and the `X-API-Key` header. Tested headless with Streamlit's AppTest. Hosted on Streamlit Community Cloud (free; Hugging Face now charges for Streamlit-capable Spaces) from `main`, with `src/rag/requirements.txt` as its dependency file. Live at https://document-rag-assistant-portfolio.streamlit.app/.
 - [x] **F7 · CI/CD and deployment** — `ci.yml` runs lint, tests (80% coverage floor) and the image build. `deploy.yml` builds the image without attestations (Lambda rejects image indexes), pushes it to ECR, updates the function and smoke-tests `/health` on every push to `dev`, through OIDC; it skips until `AWS_DEPLOY_ROLE` exists. `infra/` holds the Terraform (`terraform validate` passes). Live: the first rollout through OIDC built, pushed, updated the function and passed `/health`.
 
 ## Decisions
@@ -45,7 +45,7 @@ Live since 2026-10-07 in `us-east-1` (account `611581418226`, environment `stagi
 4. **OIDC subject** — the repository signs its tokens with GitHub's immutable subject (`repo:owner@id/name@id:…`), which the deploy role now trusts.
 5. **Cold start** — 2.7 to 3.3 s of init at 1024 or 2048 MB alike (Python imports, not CPU); warm queries answer in 0.6 to 1.2 s.
 
-Not yet: the Streamlit Community Cloud app, which needs `main` and a one-time setup in its console.
+The UI is public at https://document-rag-assistant-portfolio.streamlit.app/ (Streamlit Community Cloud, from `main`, with `RAG_API_URL` and `RAG_API_KEY` as secrets).
 
 ## Reference
 
