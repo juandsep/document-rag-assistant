@@ -6,7 +6,7 @@
   ],
   "timezone": "browser",
   "schemaVersion": 41,
-  "version": 2,
+  "version": 3,
   "refresh": "5m",
   "time": {
     "from": "now-24h",
@@ -369,10 +369,34 @@
               "*"
             ]
           },
-          "matchExact": false,
+          "matchExact": true,
           "statistic": "Maximum",
           "period": "21600",
           "label": "${PROP('Dim.ServiceName')}",
+          "id": "",
+          "expression": ""
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "region": "us-east-1",
+          "namespace": "AWS/Billing",
+          "metricName": "EstimatedCharges",
+          "dimensions": {
+            "Currency": [
+              "USD"
+            ]
+          },
+          "matchExact": true,
+          "statistic": "Maximum",
+          "period": "21600",
+          "label": "total",
           "id": "",
           "expression": ""
         }
