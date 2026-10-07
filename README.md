@@ -13,9 +13,8 @@ from them, and returns them as sources. Every change to chunking, embeddings or
 the retriever is measured with precision@k / recall@k instead of guessed. It
 runs on AWS for about $0.10/month idle, plus LLM tokens.
 
-> **Work in progress.** Retrieval and the cited-answer chain work locally
-> against Qdrant Cloud and Ollama Cloud; nothing is deployed to AWS yet.
-> Status, decisions and blockers: [PLAN.md](PLAN.md).
+> **Live on AWS** (Lambda, `us-east-1`); the API needs an `X-API-Key`. The
+> public Streamlit UI is next. Status and decisions: [PLAN.md](PLAN.md).
 
 ## How it works
 
