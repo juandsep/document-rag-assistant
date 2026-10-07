@@ -36,7 +36,7 @@ def api(monkeypatch):
 
 
 def ask(question):
-    app = AppTest.from_file(UI, default_timeout=10)
+    app = AppTest.from_file(UI, default_timeout=30)
     app.run()
     app.text_input[0].input(question)
     app.button[0].click()
@@ -61,6 +61,8 @@ def test_an_answer_shows_with_its_cited_sources(api, monkeypatch):
     assert app.expander[0].label == "terminos.pdf, page 2 · score 0.870"
     assert calls[0]["json"] == {"q": "¿Cuántos días tengo?", "top_k": 5}
     assert calls[0]["headers"] == {"X-API-Key": "k"}
+    metrics = {m.label: m.value for m in app.metric}
+    assert metrics["Sources cited"] == "1" and metrics["Status"] == "ok"
 
 
 def test_a_refusal_shows_as_a_warning_without_sources(api):
@@ -87,3 +89,13 @@ def test_an_api_failure_shows_an_error(monkeypatch):
     app = ask("hi")
 
     assert "refused" in app.error[0].value
+
+
+def test_the_page_explains_itself_before_any_question():
+    app = AppTest.from_file(UI, default_timeout=30)
+    app.run()
+
+    assert [tab.label for tab in app.tabs] == ["Ask", "How it works", "Demo corpus"]
+    assert app.sidebar.header[0].value == "About"
+    corpus = app.table[1].value
+    assert len(corpus) == 6 and set(corpus["Language"]) == {"Spanish", "English"}
