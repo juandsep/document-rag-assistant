@@ -70,7 +70,7 @@ def _retriever() -> Retriever:
     return get_retriever()
 
 
-app = FastAPI(title="Document RAG Assistant", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="Document RAG Assistant", version="1.0.0", lifespan=lifespan)
 
 
 class QueryRequest(BaseModel):
