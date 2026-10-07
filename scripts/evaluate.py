@@ -2,7 +2,7 @@
 
 Usage:
     uv run --env-file .env python scripts/evaluate.py [--version V] [--k 3]
-        [--chain] [--min-recall 0.8] [--promote]
+        [--chain] [--min-recall 0.8] [--min-decisions 0.9] [--promote]
 
 Reads the labelled questions in eval/questions.jsonl ({"q", "relevant"}; an
 empty "relevant" marks a question the corpus cannot answer). Retrieval is
@@ -10,6 +10,9 @@ scored at document level: precision@k, recall@k, hit rate@k and MRR over the
 answerable questions. With --chain it also asks the full chain and scores
 whether it answered the answerable questions and refused the others, with
 latency percentiles.
+
+--min-decisions also gates on the share of right answer/refuse decisions (with
+--chain). Under GitHub Actions the metrics go to the job summary as a table.
 
 --version evaluates a Qdrant collection that is not serving yet; --promote
 moves the alias to it only when recall@k reaches --min-recall. That is the
@@ -65,6 +68,7 @@ def main() -> int:
     parser.add_argument("--k", type=int, default=3)
     parser.add_argument("--chain", action="store_true", help="also score answers")
     parser.add_argument("--min-recall", type=float, default=0.8)
+    parser.add_argument("--min-decisions", type=float, help="with --chain")
     parser.add_argument("--promote", action="store_true")
     args = parser.parse_args()
 
@@ -116,11 +120,21 @@ def main() -> int:
         logged = log_evaluation(metrics, params)
         print("MLflow:", "logged" if logged else "not installed (uv sync)")
 
-    passed = metrics[f"recall_at_{args.k}"] >= args.min_recall
-    print(
-        f"recall@{args.k} {'>=' if passed else '<'} {args.min_recall}: "
-        f"{'PASS' if passed else 'FAIL'}"
-    )
+    gates = {f"recall_at_{args.k}": args.min_recall}
+    if args.chain and args.min_decisions is not None:
+        gates["answer_decision_accuracy"] = args.min_decisions
+    failed = [name for name, floor in gates.items() if metrics[name] < floor]
+    passed = not failed
+    for name, floor in gates.items():
+        verdict = "FAIL" if name in failed else "PASS"
+        print(f"{name} >= {floor}: {verdict} ({metrics[name]:.3f})")
+    if summary := os.getenv("GITHUB_STEP_SUMMARY"):
+        with open(summary, "a") as out:
+            out.write(f"### Offline evaluation ({'pass' if passed else 'FAIL'})\n\n")
+            out.write("| Metric | Value | Gate |\n|---|---|---|\n")
+            for name, value in metrics.items():
+                gate = f">= {gates[name]}" if name in gates else ""
+                out.write(f"| {name} | {value:.3f} | {gate} |\n")
     if args.promote:
         if not (passed and args.version):
             print("not promoted: needs --version and a passing recall")
