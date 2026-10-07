@@ -40,12 +40,6 @@ def load_secrets(ssm: Any = None) -> None:
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     load_secrets()
-    # Importing qdrant_client takes ~2.5 s. Paying it here, before /health
-    # answers and Lambda routes traffic, keeps it off the first query.
-    try:
-        getattr(_retriever(), "client", None)
-    except Exception as exc:  # noqa: BLE001 - a missing config fails on /query
-        print(f"retriever warm-up skipped: {exc!r}", flush=True)
     yield
 
 

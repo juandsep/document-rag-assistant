@@ -2,6 +2,10 @@
 
 ## Request path
 
+Diagrams: [`diagrams/architecture.png`](diagrams/architecture.png) and
+[`diagrams/query.png`](diagrams/query.png), generated with Archify from the
+JSON next to them (`archify deliver architecture|sequence <spec>.json <out>.html`).
+
 This page describes the target design. What already works is tracked in
 [`PLAN.md`](../PLAN.md); sections marked *(planned)* do not exist in code yet.
 
@@ -106,6 +110,35 @@ Known limitation: short English questions over Spanish documents rank lower.
 the first), so at k = 3 the chain never sees it and refuses. The API's default
 `top_k` of 5 covers it; a stronger multilingual embedding model would fix it at
 the source.
+
+### RAG against the model alone
+
+`scripts/compare.py` asks every labelled question twice with the same model:
+through the chain, and alone (told it may say it does not know). An LLM judge
+grades each answer to an answerable question against its reference answer in
+`eval/questions.jsonl`, on facts only; for the four questions the corpus cannot
+answer, refusing is right and any answer counts as a hallucination.
+
+| `gpt-oss:120b`, 20 questions | RAG (k = 5) | Model alone |
+|---|---|---|
+| Correct answers (16 answerable) | **100%** | 19% |
+| Refused although answerable | 0% | 69% |
+| Refused the 4 unanswerable | **100%** | 75% |
+| Hallucinated (of all 20) | **0%** | 15% |
+| Latency p50 / p95 | 1.25 s / 2.50 s | 0.97 s / 2.05 s |
+| Prompt tokens, average | 906 | 136 |
+
+The model alone mostly refuses, which is the honest failure: it cannot know a
+fictional store's policies. Where it does answer it guesses — that Norte Retail
+has physical stores, where the data is stored, what to do with a late order.
+Retrieval buys correctness and grounded refusals for about 0.3 s and 770
+prompt tokens per question.
+
+Read it with its limits: 20 questions over 6 short documents, and the judge is
+the same model that answers. The first judge prompt also failed a correct
+answer for being in the wrong language; it now grades facts only, and that
+answer ("12 months", given in Spanish to an English question) shows the chain
+can still slip on the reply language.
 
 ## Failure behaviour
 

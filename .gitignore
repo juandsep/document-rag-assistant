@@ -39,3 +39,6 @@ index/
 
 # graphify knowledge graph (regenerate with /graphify . --update)
 graphify-out/
+
+# archify visual-check evidence (regenerate with archify visual-check)
+docs/diagrams/*.visual-check.*

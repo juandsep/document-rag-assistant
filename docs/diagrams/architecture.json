@@ -1,0 +1,311 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Document RAG Assistant on AWS",
+    "quality_profile": "showcase",
+    "viewBox": [
+      1360,
+      700
+    ]
+  },
+  "components": [
+    {
+      "id": "user",
+      "type": "external",
+      "label": "Reader",
+      "sublabel": "Browser",
+      "pos": [
+        20,
+        300
+      ],
+      "size": [
+        130,
+        68
+      ]
+    },
+    {
+      "id": "ui",
+      "type": "frontend",
+      "label": "Streamlit UI",
+      "sublabel": "Community Cloud",
+      "pos": [
+        230,
+        300
+      ],
+      "size": [
+        150,
+        68
+      ]
+    },
+    {
+      "id": "api",
+      "type": "backend",
+      "label": "FastAPI on Lambda",
+      "sublabel": "Function URL",
+      "brand": "fastapi",
+      "pos": [
+        500,
+        300
+      ],
+      "size": [
+        280,
+        68
+      ]
+    },
+    {
+      "id": "ecr",
+      "type": "cloud",
+      "label": "Amazon ECR",
+      "sublabel": "API image",
+      "pos": [
+        565,
+        120
+      ],
+      "size": [
+        150,
+        68
+      ]
+    },
+    {
+      "id": "ssm",
+      "type": "security",
+      "label": "SSM SecureString",
+      "sublabel": "API keys",
+      "pos": [
+        495,
+        500
+      ],
+      "size": [
+        150,
+        68
+      ]
+    },
+    {
+      "id": "logs",
+      "type": "cloud",
+      "label": "CloudWatch",
+      "sublabel": "rag_query logs, alarms",
+      "pos": [
+        670,
+        500
+      ],
+      "size": [
+        160,
+        68
+      ]
+    },
+    {
+      "id": "ci",
+      "type": "messagebus",
+      "label": "GitHub Actions",
+      "sublabel": "deploy.yml",
+      "brand": "github-actions",
+      "pos": [
+        230,
+        120
+      ],
+      "size": [
+        150,
+        68
+      ]
+    },
+    {
+      "id": "qdrant",
+      "type": "database",
+      "label": "Qdrant Cloud",
+      "sublabel": "Vectors + embeddings",
+      "pos": [
+        920,
+        200
+      ],
+      "size": [
+        170,
+        68
+      ]
+    },
+    {
+      "id": "llm",
+      "type": "external",
+      "label": "Ollama Cloud",
+      "sublabel": "gpt-oss:120b",
+      "brand": "ollama",
+      "pos": [
+        920,
+        400
+      ],
+      "size": [
+        170,
+        68
+      ]
+    },
+    {
+      "id": "grafana",
+      "type": "frontend",
+      "label": "Grafana",
+      "sublabel": "Local, read-only",
+      "brand": "grafana",
+      "pos": [
+        920,
+        590
+      ],
+      "size": [
+        170,
+        68
+      ]
+    },
+    {
+      "id": "scripts",
+      "type": "external",
+      "label": "Index + evaluate",
+      "sublabel": "scripts/, laptop or CI",
+      "pos": [
+        1170,
+        200
+      ],
+      "size": [
+        160,
+        68
+      ]
+    },
+    {
+      "id": "mlflow",
+      "type": "database",
+      "label": "MLflow",
+      "sublabel": "Shared, Cloud Run",
+      "pos": [
+        1170,
+        400
+      ],
+      "size": [
+        160,
+        68
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "AWS us-east-1",
+      "wraps": [
+        "api",
+        "ecr",
+        "ssm",
+        "logs"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "user-ui",
+      "from": "user",
+      "to": "ui",
+      "label": "question"
+    },
+    {
+      "id": "ui-api",
+      "from": "ui",
+      "to": "api",
+      "label": "POST /query + key",
+      "variant": "emphasis"
+    },
+    {
+      "id": "api-qdrant",
+      "from": "api",
+      "to": "qdrant",
+      "label": "top-k (REST)"
+    },
+    {
+      "id": "api-llm",
+      "from": "api",
+      "to": "llm",
+      "label": "cited answer"
+    },
+    {
+      "id": "api-ssm",
+      "from": "ssm",
+      "to": "api",
+      "label": "keys at start",
+      "variant": "security",
+      "fromSide": "top",
+      "toSide": "bottom"
+    },
+    {
+      "id": "api-logs",
+      "from": "api",
+      "to": "logs",
+      "label": "one line per query",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "logs-grafana",
+      "from": "logs",
+      "to": "grafana",
+      "label": "Logs Insights",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "left"
+    },
+    {
+      "id": "ci-ecr",
+      "from": "ci",
+      "to": "ecr",
+      "label": "image via OIDC"
+    },
+    {
+      "id": "ecr-api",
+      "from": "ecr",
+      "to": "api",
+      "label": "roll out",
+      "labelAt": [
+        640,
+        244
+      ]
+    },
+    {
+      "id": "scripts-qdrant",
+      "from": "scripts",
+      "to": "qdrant",
+      "label": "new version"
+    },
+    {
+      "id": "scripts-mlflow",
+      "from": "scripts",
+      "to": "mlflow",
+      "label": "eval runs",
+      "variant": "dashed",
+      "labelAt": [
+        1250,
+        334
+      ]
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Request path",
+      "items": [
+        "Retrieve top-k passages from the alias",
+        "Answer only from them, cite [n]",
+        "Refuse when they do not cover it"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Idle cost ~$0.10/month",
+      "items": [
+        "Only the API runs in AWS",
+        "Vectors, LLM, UI and MLflow on free tiers"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Index versions",
+      "items": [
+        "Each reindex is a new collection",
+        "Promoted only if recall@k passes"
+      ]
+    }
+  ]
+}
