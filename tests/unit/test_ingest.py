@@ -2,7 +2,7 @@
 
 import pytest
 
-from rag.ingest import chunk_document, chunk_text, clean, load_pages
+from rag.ingest import chunk_document, chunk_text, clean, load_pages, textless_pages
 
 
 def _pdf(path, pages):
@@ -124,3 +124,12 @@ def test_with_translations_adds_a_copy_searchable_in_the_other_language():
         ),
         ("en.txt", "Shipping takes 5 days.", "<Spanish> Shipping takes 5 days."),
     ]
+
+
+def test_textless_pages_flags_pdf_pages_without_a_text_layer(tmp_path):
+    _pdf(tmp_path / "mixed.pdf", ["Terms of sale.", "", "Shipping rules."])
+
+    pages = load_pages(tmp_path / "mixed.pdf")
+
+    assert textless_pages(pages) == [2]
+    assert textless_pages([(None, "")]) == []  # only PDF pages count

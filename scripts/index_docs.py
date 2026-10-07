@@ -4,7 +4,8 @@ Usage:
     uv run --env-file .env python scripts/index_docs.py <corpus-dir>
 
 Walks the directory for .txt, .md, .pdf and .docx files, cleans and chunks
-them, drops chunks whose text already appeared (copies of the same document,
+them (a PDF page without a text layer, i.e. scanned, is reported and left out:
+there is no OCR), drops chunks whose text already appeared (copies of the same document,
 repeated boilerplate), and upserts the rest into the backend selected by
 VECTOR_BACKEND. Every chunk is also embedded in the other language (Spanish or
 English) through the Ollama model, so a question finds a passage written in
@@ -20,7 +21,13 @@ import sys
 from pathlib import Path
 
 from rag import chain
-from rag.ingest import SUPPORTED, chunk_document, with_translations
+from rag.ingest import (
+    SUPPORTED,
+    chunk_pages,
+    load_pages,
+    textless_pages,
+    with_translations,
+)
 from rag.retrievers import get_retriever
 
 
@@ -47,8 +54,18 @@ def main(root: str, translate_chunks: bool = True) -> None:
             print(f"skipped {path.relative_to(base)}: unsupported format")
             continue
         doc_id = path.relative_to(base).as_posix()
+        pages = load_pages(path)
+        if blank := textless_pages(pages):
+            if len(blank) == len(pages):
+                print(
+                    f"skipped {doc_id}: no text layer (scanned?); only digital PDFs are supported"
+                )
+                continue
+            print(
+                f"warning {doc_id}: pages {blank} have no text layer and are left out"
+            )
         kept = 0
-        for chunk in chunk_document(path, doc_id):
+        for chunk in chunk_pages(pages, doc_id):
             digest = hashlib.sha256(chunk.text.casefold().encode()).hexdigest()
             if digest in seen:
                 duplicates += 1

@@ -65,7 +65,8 @@ generation; a cold start adds 1.3–1.7 s.
 
 ### Indexing and evaluation
 
-`scripts/index_docs.py` loads `.txt`, `.md`, `.pdf` (page by page) and `.docx`,
+`scripts/index_docs.py` loads `.txt`, `.md`, digital `.pdf` (page by page; scanned
+pages are reported, not read) and `.docx`,
 cleans and chunks them, drops duplicates, embeds each chunk in Spanish and
 English (so a question in either language finds it) and writes a **new**
 collection;

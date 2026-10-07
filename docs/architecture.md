@@ -43,9 +43,11 @@ everything through. The model judges sufficiency instead.
 .txt .md .pdf .docx ──▶ load (pages) ──▶ clean ──▶ chunk ──▶ dedupe ──▶ translate ──▶ upsert (index vN)
 ```
 
-`ingest.load_pages` reads plain text and Markdown whole, PDFs page by page
+`ingest.load_pages` reads plain text and Markdown whole, digital PDFs page by page
 (the page number travels with each chunk, so answers can cite it) and DOCX
-paragraphs plus tables. Cleaning rejoins words hyphenated across PDF lines and
+paragraphs plus tables. There is no OCR: a PDF page without a text layer
+(scanned) is reported by `index_docs.py` and left out, and a fully scanned PDF
+is skipped. Cleaning rejoins words hyphenated across PDF lines and
 collapses whitespace. Chunking is a sliding window (`ingest.chunk_text`, 800
 characters, 100 of overlap) so a fact split across a boundary is still
 retrievable. `scripts/index_docs.py` drops chunks whose text already appeared,
