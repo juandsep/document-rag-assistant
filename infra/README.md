@@ -151,6 +151,7 @@ git-ignored `.env`.
 | `QDRANT_URL` / `QDRANT_API_KEY` | Qdrant Cloud cluster and its key |
 | `QDRANT_ALIAS` | alias queries go through (default `document-rag`) |
 | `MLFLOW_TRACKING_URI` / `MLFLOW_TRACKING_TOKEN` | shared MLflow server, for offline evaluation runs only (never set on Lambda) |
+| `DEEPSEEK_API_KEY` / `DEEPSEEK_MODEL` | independent judge for `scripts/compare.py` (default `deepseek-flash`); evaluation only, never on Lambda |
 | `OLLAMA_BASE_URL` / `OLLAMA_MODEL` / `OLLAMA_API_KEY` | Ollama endpoint (local default `http://localhost:11434`, deployed `https://ollama.com`), generation model (default `gpt-oss:120b`) and bearer token |
 | `EMBEDDING_MODEL` | embedding model the `local` backend asks Ollama for |
 | `APP_SECRET_PARAMETER` | SecureString whose JSON keys the API copies into its environment at startup (Lambda only; local runs use `.env`) |

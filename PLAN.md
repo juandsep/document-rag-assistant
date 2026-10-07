@@ -28,6 +28,7 @@ Each phase is one short-lived branch cut from `dev`, one pull request, one conce
 - **Monitoring as in `telegram-personal-assistant`:** CloudWatch collects always (Lambda's built-in metrics are free, Logs Insights queries cost cents) and mails alarms; Grafana runs locally with Docker, read-only, and costs nothing when stopped. Spend comes from the `AWS/Billing` metric plus the LLM cost logged per query.
 - **Lazy clients.** Vector-store, LLM and MLflow clients are built on first use; tests and the Docker build stay green with no environment variables set.
 - **Cross-language retrieval by translating at index time, not hybrid search** (v1.1). On 14 bilingual documents every dense miss was a question in one language about a document in the other. Embedding a translation of each chunk next to the original raised recall@3 from 0.862 to 0.968 at no cost per query. Dense + BM25 (`qdrant/bm25`) lowered recall@3 to 0.71–0.78 under every fusion tried, so it is not used; details in `docs/architecture.md`.
+- **An independent judge** (v1.1). The comparison's answers are graded by DeepSeek `deepseek-flash` through its API, not by the model that wrote them; a fraction of a cent per run. Self-grading agreed on 97% of answers, but the bias it had ran toward its own guesses.
 - **English everywhere** in the repository. `ingest.py` still carries Spanish docstrings and messages; translate it in whichever change next touches it.
 
 ## Success metrics

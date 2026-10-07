@@ -158,13 +158,13 @@
       "id": "scripts",
       "type": "external",
       "label": "Index + evaluate",
-      "sublabel": "scripts/, laptop or CI",
+      "sublabel": "index ES+EN, evaluate",
       "pos": [
-        1170,
+        1160,
         200
       ],
       "size": [
-        160,
+        150,
         68
       ]
     },
@@ -174,11 +174,25 @@
       "label": "MLflow",
       "sublabel": "Shared, Cloud Run",
       "pos": [
-        1170,
+        1160,
         400
       ],
       "size": [
-        160,
+        150,
+        68
+      ]
+    },
+    {
+      "id": "judge",
+      "type": "external",
+      "label": "DeepSeek",
+      "sublabel": "Independent judge",
+      "pos": [
+        1160,
+        590
+      ],
+      "size": [
+        150,
         68
       ]
     }
@@ -276,8 +290,40 @@
       "label": "eval runs",
       "variant": "dashed",
       "labelAt": [
-        1250,
+        1235,
         334
+      ]
+    },
+    {
+      "id": "scripts-llm",
+      "from": "scripts",
+      "to": "llm",
+      "label": "translate chunks",
+      "variant": "dashed",
+      "fromSide": "left",
+      "toSide": "right"
+    },
+    {
+      "id": "scripts-judge",
+      "from": "scripts",
+      "to": "judge",
+      "label": "grade answers",
+      "variant": "dashed",
+      "fromSide": "right",
+      "toSide": "right",
+      "via": [
+        [
+          1340,
+          234
+        ],
+        [
+          1340,
+          624
+        ]
+      ],
+      "labelAt": [
+        1294,
+        530
       ]
     }
   ],
@@ -304,6 +350,7 @@
       "title": "Index versions",
       "items": [
         "Each reindex is a new collection",
+        "Every chunk embedded in Spanish and English",
         "Promoted only if recall@k passes"
       ]
     }

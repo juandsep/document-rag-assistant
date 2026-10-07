@@ -32,14 +32,14 @@ labelled question set, the same model, graded by an independent judge
 
 ## How it works
 
-![Architecture: Streamlit UI calls the Lambda API with a key; the API retrieves from Qdrant Cloud, generates with Ollama Cloud, reads keys from SSM and logs to CloudWatch; GitHub Actions ships the image through ECR](docs/diagrams/architecture.png)
+![Architecture: Streamlit UI calls the Lambda API with a key; the API retrieves from Qdrant Cloud, generates with Ollama Cloud, reads keys from SSM and logs to CloudWatch; GitHub Actions ships the image through ECR; the index and evaluate scripts translate chunks with Ollama, write versions to Qdrant, log runs to MLflow and have answers graded by DeepSeek](docs/diagrams/architecture.png)
 
 Only the API runs in AWS: one Lambda function serving FastAPI through a
 Function URL, with no load balancer or VPC, so nothing is billed while idle
 (about $0.05/month). Everything else lives on free tiers outside AWS: Qdrant
 Cloud stores the vectors and computes the embeddings, Ollama Cloud generates,
-Streamlit Community Cloud hosts the UI and a shared MLflow keeps the
-evaluation runs. Keys sit in an SSM SecureString; every push to `dev` ships a
+Streamlit Community Cloud hosts the UI, a shared MLflow keeps the
+evaluation runs and DeepSeek grades them as an independent judge. Keys sit in an SSM SecureString; every push to `dev` ships a
 new image through GitHub Actions and OIDC, with no stored AWS keys.
 [Interactive version](https://htmlpreview.github.io/?https://github.com/juandsep/document-rag-assistant/blob/main/docs/diagrams/architecture.html) (pan, zoom, trace a path; source in `docs/diagrams/`).
 
@@ -91,7 +91,8 @@ the RAG against the model alone. On 56 questions over 14 documents: recall@3
 
 Requires [uv](https://docs.astral.sh/uv/), Python 3.11, and a `.env` with
 `VECTOR_BACKEND=qdrant`, `QDRANT_URL`, `QDRANT_API_KEY`,
-`OLLAMA_BASE_URL=https://ollama.com` and `OLLAMA_API_KEY` (all variables:
+`OLLAMA_BASE_URL=https://ollama.com` and `OLLAMA_API_KEY`; `DEEPSEEK_API_KEY` only
+for the comparison's judge (all variables:
 [infra/README.md](infra/README.md#configuration)).
 
 ```bash
@@ -101,6 +102,7 @@ uv run ruff check . && uv run ruff format --check .
 
 uv run --env-file .env python scripts/index_docs.py eval/corpus   # prints the version
 uv run --env-file .env python scripts/evaluate.py --chain         # scores what is serving
+uv run --env-file .env python scripts/compare.py                  # RAG vs model alone, DeepSeek judge
 uv run --env-file .env rag                                        # API on http://localhost:8000
 uv run --env-file .env streamlit run src/rag/ui.py                # UI against RAG_API_URL
 ```
