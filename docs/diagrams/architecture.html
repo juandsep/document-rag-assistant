@@ -5168,8 +5168,10 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
         <path data-edge-from="logs" data-edge-to="grafana" data-edge-label="Logs Insights" data-edge-key="6" data-edge-id="logs-grafana" data-composition-points="750,568;750,592;896,592;896,624;920,624" d="M 750 568 L 750 584 Q 750 592 758 592 L 888 592 Q 896 592 896 600 L 896 616 Q 896 624 904 624 L 920 624" class="a-dashed" stroke-width="1.5" marker-end="url(#arrowhead-dashed)"/>
         <path data-edge-from="ci" data-edge-to="ecr" data-edge-label="image via OIDC" data-edge-key="7" data-edge-id="ci-ecr" data-composition-points="380,154;565,154" d="M 380 154 L 565 154" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
         <path data-edge-from="ecr" data-edge-to="api" data-edge-label="roll out" data-edge-key="8" data-edge-id="ecr-api" data-composition-points="640,188;640,300" d="M 640 188 L 640 300" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
-        <path data-edge-from="scripts" data-edge-to="qdrant" data-edge-label="new version" data-edge-key="9" data-edge-id="scripts-qdrant" data-composition-points="1170,234;1090,234" d="M 1170 234 L 1090 234" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
-        <path data-edge-from="scripts" data-edge-to="mlflow" data-edge-label="eval runs" data-edge-key="10" data-edge-id="scripts-mlflow" data-composition-points="1250,268;1250,400" d="M 1250 268 L 1250 400" class="a-dashed" stroke-width="1.5" marker-end="url(#arrowhead-dashed)"/>
+        <path data-edge-from="scripts" data-edge-to="qdrant" data-edge-label="new version" data-edge-key="9" data-edge-id="scripts-qdrant" data-composition-points="1160,227;1090,227" d="M 1160 227 L 1090 227" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        <path data-edge-from="scripts" data-edge-to="mlflow" data-edge-label="eval runs" data-edge-key="10" data-edge-id="scripts-mlflow" data-composition-points="1235,268;1235,400" d="M 1235 268 L 1235 400" class="a-dashed" stroke-width="1.5" marker-end="url(#arrowhead-dashed)"/>
+        <path data-edge-from="scripts" data-edge-to="llm" data-edge-label="translate chunks" data-edge-key="11" data-edge-id="scripts-llm" data-composition-points="1160,241;1125,241;1125,434;1090,434" d="M 1160 241 L 1133 241 Q 1125 241 1125 249 L 1125 426 Q 1125 434 1117 434 L 1090 434" class="a-dashed" stroke-width="1.5" marker-end="url(#arrowhead-dashed)"/>
+        <path data-edge-from="scripts" data-edge-to="judge" data-edge-label="grade answers" data-edge-key="12" data-edge-id="scripts-judge" data-composition-points="1310,234;1340,234;1340,624;1310,624" d="M 1310 234 L 1332 234 Q 1340 234 1340 242 L 1340 616 Q 1340 624 1332 624 L 1310 624" class="a-dashed" stroke-width="1.5" marker-end="url(#arrowhead-dashed)"/>
 
         <!-- Components -->
         <g id="node-user" data-node-id="user" data-node-label="Reader" tabindex="0" role="button" aria-label="Focus Reader, Browser, Architecture component" aria-pressed="false" data-node-kind="external" data-node-sublabel="Browser" data-node-context="Architecture component">
@@ -5315,28 +5317,40 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
         <text data-detail="context" x="1005" y="638" class="t-muted" font-size="9" text-anchor="middle">Local, read-only</text>
         </g>
 
-        <g id="node-scripts" data-node-id="scripts" data-node-label="Index + evaluate" tabindex="0" role="button" aria-label="Focus Index + evaluate, scripts/, laptop or CI, Architecture component" aria-pressed="false" data-node-kind="external" data-node-sublabel="scripts/, laptop or CI" data-node-context="Architecture component">
-          <title>Index + evaluate · scripts/, laptop or CI · Architecture component</title>
-          <rect x="1170" y="200" width="160" height="68" rx="6" class="c-mask"/>
-          <rect x="1170" y="200" width="160" height="68" rx="6" class="c-external" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="external" class="semantic-sigil s-external" transform="translate(1176 206) scale(0.6875)">
+        <g id="node-scripts" data-node-id="scripts" data-node-label="Index + evaluate" tabindex="0" role="button" aria-label="Focus Index + evaluate, index ES+EN, evaluate, Architecture component" aria-pressed="false" data-node-kind="external" data-node-sublabel="index ES+EN, evaluate" data-node-context="Architecture component">
+          <title>Index + evaluate · index ES+EN, evaluate · Architecture component</title>
+          <rect x="1160" y="200" width="150" height="68" rx="6" class="c-mask"/>
+          <rect x="1160" y="200" width="150" height="68" rx="6" class="c-external" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="external" class="semantic-sigil s-external" transform="translate(1166 206) scale(0.6875)">
             <rect x="2.5" y="5" width="8.5" height="8" rx="1.5"/>
             <path d="M8 2.5h5.5V8M13.5 2.5 7.5 8.5"/>
           </g>
-          <text data-node-label="" data-detail-anchor="" x="1250" y="232" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Index + evaluate</text>
-        <text data-detail="context" x="1250" y="248" class="t-muted" font-size="9" text-anchor="middle">scripts/, laptop or CI</text>
+          <text data-node-label="" data-detail-anchor="" x="1235" y="232" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Index + evaluate</text>
+        <text data-detail="context" x="1235" y="248" class="t-muted" font-size="9" text-anchor="middle">index ES+EN, evaluate</text>
         </g>
 
         <g id="node-mlflow" data-node-id="mlflow" data-node-label="MLflow" tabindex="0" role="button" aria-label="Focus MLflow, Shared, Cloud Run, Architecture component" aria-pressed="false" data-node-kind="database" data-node-sublabel="Shared, Cloud Run" data-node-context="Architecture component">
           <title>MLflow · Shared, Cloud Run · Architecture component</title>
-          <rect x="1170" y="400" width="160" height="68" rx="6" class="c-mask"/>
-          <rect x="1170" y="400" width="160" height="68" rx="6" class="c-database" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="database" class="semantic-sigil s-database" transform="translate(1176 406) scale(0.6875)">
+          <rect x="1160" y="400" width="150" height="68" rx="6" class="c-mask"/>
+          <rect x="1160" y="400" width="150" height="68" rx="6" class="c-database" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="database" class="semantic-sigil s-database" transform="translate(1166 406) scale(0.6875)">
             <ellipse cx="8" cy="4" rx="5" ry="2"/>
             <path d="M3 4v8c0 1.1 2.2 2 5 2s5-.9 5-2V4M3 8c0 1.1 2.2 2 5 2s5-.9 5-2"/>
           </g>
-          <text data-node-label="" data-detail-anchor="" x="1250" y="432" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">MLflow</text>
-        <text data-detail="context" x="1250" y="448" class="t-muted" font-size="9" text-anchor="middle">Shared, Cloud Run</text>
+          <text data-node-label="" data-detail-anchor="" x="1235" y="432" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">MLflow</text>
+        <text data-detail="context" x="1235" y="448" class="t-muted" font-size="9" text-anchor="middle">Shared, Cloud Run</text>
+        </g>
+
+        <g id="node-judge" data-node-id="judge" data-node-label="DeepSeek" tabindex="0" role="button" aria-label="Focus DeepSeek, Independent judge, Architecture component" aria-pressed="false" data-node-kind="external" data-node-sublabel="Independent judge" data-node-context="Architecture component">
+          <title>DeepSeek · Independent judge · Architecture component</title>
+          <rect x="1160" y="590" width="150" height="68" rx="6" class="c-mask"/>
+          <rect x="1160" y="590" width="150" height="68" rx="6" class="c-external" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="external" class="semantic-sigil s-external" transform="translate(1166 596) scale(0.6875)">
+            <rect x="2.5" y="5" width="8.5" height="8" rx="1.5"/>
+            <path d="M8 2.5h5.5V8M13.5 2.5 7.5 8.5"/>
+          </g>
+          <text data-node-label="" data-detail-anchor="" x="1235" y="622" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">DeepSeek</text>
+        <text data-detail="context" x="1235" y="638" class="t-muted" font-size="9" text-anchor="middle">Independent judge</text>
         </g>
 
         <!-- Connection labels -->
@@ -5377,12 +5391,20 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
           <text x="640" y="244" class="t-muted" font-size="8" text-anchor="middle">roll out</text>
         </g>
         <g data-detail="context" data-edge-from="scripts" data-edge-to="qdrant" data-edge-label="new version" data-edge-key="9" data-edge-id="scripts-qdrant">
-          <rect x="1098.6" y="214" width="62.8" height="14" rx="3" class="c-mask"/>
-          <text x="1130" y="224" class="t-muted" font-size="8" text-anchor="middle">new version</text>
+          <rect x="1093.6" y="207" width="62.8" height="14" rx="3" class="c-mask"/>
+          <text x="1125" y="217" class="t-muted" font-size="8" text-anchor="middle">new version</text>
         </g>
         <g data-detail="context" data-edge-from="scripts" data-edge-to="mlflow" data-edge-label="eval runs" data-edge-key="10" data-edge-id="scripts-mlflow">
-          <rect x="1223.4" y="324" width="53.199999999999996" height="14" rx="3" class="c-mask"/>
-          <text x="1250" y="334" class="t-messagebus" font-size="8" text-anchor="middle">eval runs</text>
+          <rect x="1208.4" y="324" width="53.199999999999996" height="14" rx="3" class="c-mask"/>
+          <text x="1235" y="334" class="t-messagebus" font-size="8" text-anchor="middle">eval runs</text>
+        </g>
+        <g data-detail="context" data-edge-from="scripts" data-edge-to="llm" data-edge-label="translate chunks" data-edge-key="11" data-edge-id="scripts-llm">
+          <rect x="1081.6" y="317.5" width="86.8" height="14" rx="3" class="c-mask"/>
+          <text x="1125" y="327.5" class="t-messagebus" font-size="8" text-anchor="middle">translate chunks</text>
+        </g>
+        <g data-detail="context" data-edge-from="scripts" data-edge-to="judge" data-edge-label="grade answers" data-edge-key="12" data-edge-id="scripts-judge">
+          <rect x="1257.8" y="520" width="72.4" height="14" rx="3" class="c-mask"/>
+          <text x="1294" y="530" class="t-messagebus" font-size="8" text-anchor="middle">grade answers</text>
         </g>
 
         <!-- Boundary labels (foreground masks keep routes out of titles) -->
@@ -5609,6 +5631,7 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
         </div>
         <ul>
           <li>&bull; Each reindex is a new collection</li>
+          <li>&bull; Every chunk embedded in Spanish and English</li>
           <li>&bull; Promoted only if recall@k passes</li>
         </ul>
       </div>

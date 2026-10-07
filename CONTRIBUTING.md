@@ -62,6 +62,9 @@ first, then rewrite history. Deleting the commit is not enough.
   answer/refuse decisions under 0.9; the metrics are in the job summary. For a
   change that needs a reindex, attach a run on the new version
   (`evaluate.py --version <v> --chain`) and its MLflow link.
+- A change meant to improve answers, not only retrieval, also attaches a
+  `scripts/compare.py` run: it is graded by an independent judge (DeepSeek)
+  against the reference answers, and its MLflow runs show both sides.
 - Answers must keep citing their sources; a change that drops citations is a
   regression, not a simplification.
 - Reindexing is idempotent and versioned: a new corpus version gets a new index,
