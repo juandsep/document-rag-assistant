@@ -32,7 +32,7 @@
 {"q": "Do you assemble furniture in Barranquilla?", "relevant": ["instalacion.pdf"], "answer": "No, assembly is only available in Bogotá, Medellín and Cali."}
 {"q": "¿Con cuánta anticipación se agenda el armado?", "relevant": ["instalacion.pdf"], "answer": "Con al menos 48 horas de anticipación."}
 {"q": "¿Qué pasa si el técnico no llega a la cita de armado?", "relevant": ["instalacion.pdf"], "answer": "El armado es gratis."}
-{"q": "How much does international shipping cost?", "relevant": ["envios-internacionales.md"], "answer": "A flat 95,000 COP per order up to 20 kg, plus import duties paid by the customer."}
+{"q": "How much does international shipping cost?", "relevant": ["envios-internacionales.md"], "answer": "A flat 95,000 COP per order, for orders up to 20 kg."}
 {"q": "¿Puedo enviar un perfume a México?", "relevant": ["envios-internacionales.md"], "answer": "No, los perfumes no se envían al exterior."}
 {"q": "Who pays the import duties on international orders?", "relevant": ["envios-internacionales.md"], "answer": "The customer, to the carrier on delivery."}
 {"q": "¿Cuánto tiempo dura una tarjeta de regalo?", "relevant": ["tarjetas-regalo.md"], "answer": "Vence 12 meses después de la compra."}

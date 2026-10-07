@@ -14,6 +14,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from rag import ollama
+from rag.ingest import language
 from rag.retrievers import Retrieved, Retriever, get_retriever
 
 
@@ -42,22 +43,15 @@ followed by one short sentence in the question's language saying the \
 documents do not cover it.
 5. Never use knowledge from outside the passages. Be brief."""
 
-# Spanish markers: inverted punctuation, accents, frequent function words.
-_SPANISH = re.compile(
-    r"[¿¡áéíóúñ]|\b(el|la|los|las|de|que|qué|cómo|cuánto|cuántos|cuál|puedo|"
-    r"tengo|es|un|una|mi|si|se|por|para|con|hay)\b",
-    re.IGNORECASE,
-)
-
 
 def question_language(question: str) -> str:
-    """Spanish or English: the two languages the corpus and the UI support.
+    """The language to answer in, named explicitly in the prompt.
 
-    The prompt names it explicitly because, over Spanish passages, gpt-oss
-    answered English questions in Spanish half of the time when only told to
-    follow the question's language (6/12); naming it gave 18/18.
+    Over Spanish passages, gpt-oss answered English questions in Spanish half
+    of the time when only told to follow the question's language (6/12);
+    naming it gave 18/18.
     """
-    return "Spanish" if _SPANISH.search(question) else "English"
+    return language(question)
 
 
 INSUFFICIENT = "The indexed documents do not contain enough information to answer this."

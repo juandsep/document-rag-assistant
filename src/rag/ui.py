@@ -167,7 +167,7 @@ with how_tab:
     )
     st.subheader("Does retrieval help?")
     st.markdown(
-        "The same model, asked the same 20 labelled questions with and without "
+        "The same model, asked the same 56 labelled questions with and without "
         "the documents:"
     )
     st.table(
@@ -175,10 +175,10 @@ with how_tab:
             "Result": [
                 "Correct answers",
                 "Invented answers",
-                "Refused the unanswerable",
+                "Refused although answerable",
             ],
-            "With retrieval": ["100%", "0%", "100%"],
-            "Model alone": ["19–25%", "10–15%", "75–100%"],
+            "With retrieval": ["100%", "0%", "0%"],
+            "Model alone": ["19%", "5%", "75%"],
         }
     )
     st.caption(

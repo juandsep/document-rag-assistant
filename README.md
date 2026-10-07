@@ -22,12 +22,12 @@ service retrieves the relevant passages first, lets the model answer only from
 them and returns them as sources, so every claim can be checked. On the
 labelled question set, the same model ([details](docs/architecture.md#rag-against-the-model-alone)):
 
-| `gpt-oss:120b`, 20 questions | With retrieval | Alone |
+| `gpt-oss:120b`, 56 questions | With retrieval | Alone |
 |---|---|---|
 | Correct answers | **100%** | 19% |
-| Hallucinated answers | **0%** | 15% |
-| Refused the unanswerable ones | **100%** | 75% |
-| Latency p50 | 1.25 s | 0.97 s |
+| Hallucinated answers | **0%** | 5% |
+| Refused although answerable | **0%** | 75% |
+| Latency p50 | 1.32 s | 0.94 s |
 
 ## How it works
 
@@ -66,11 +66,14 @@ generation; a cold start adds 1.3–1.7 s.
 ### Indexing and evaluation
 
 `scripts/index_docs.py` loads `.txt`, `.md`, `.pdf` (page by page) and `.docx`,
-cleans and chunks them, drops duplicates and writes a **new** collection;
+cleans and chunks them, drops duplicates, embeds each chunk in Spanish and
+English (so a question in either language finds it) and writes a **new**
+collection;
 nothing overwrites the version that is serving. `scripts/evaluate.py` scores a
 candidate (recall@k, MRR, answer decisions, latency), logs the run to MLflow
 and moves the alias only when recall@k passes. `scripts/compare.py` measures
-the RAG against the model alone. First run: recall@3 0.94, MRR 0.81.
+the RAG against the model alone. On 56 questions over 14 documents: recall@3
+0.97, MRR 0.87, 55/56 right decisions.
 
 ## Documentation
 

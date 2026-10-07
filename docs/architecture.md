@@ -40,7 +40,7 @@ everything through. The model judges sufficiency instead.
 ## Indexing
 
 ```
-.txt .md .pdf .docx ──▶ load (pages) ──▶ clean ──▶ chunk ──▶ dedupe ──▶ upsert (index vN)
+.txt .md .pdf .docx ──▶ load (pages) ──▶ clean ──▶ chunk ──▶ dedupe ──▶ translate ──▶ upsert (index vN)
 ```
 
 `ingest.load_pages` reads plain text and Markdown whole, PDFs page by page
@@ -51,6 +51,13 @@ characters, 100 of overlap) so a fact split across a boundary is still
 retrievable. `scripts/index_docs.py` drops chunks whose text already appeared,
 so a copied document or repeated boilerplate is indexed once. A document's id
 is its path relative to the corpus root.
+
+Each chunk is then translated into the other language (Spanish ↔ English) with
+the chain's model, and both forms are embedded as separate points that carry
+the **original** text (`ingest.with_translations`). A question in either
+language finds the passage; the answer still cites the document as written.
+Queries over-fetch and keep each passage once. It costs about 2 s per chunk at
+index time and nothing per query; `index_docs.py --no-translate` skips it.
 
 Reindexing writes a **new** index version and never overwrites an older one:
 a `document-rag-v<UTC timestamp>` collection in Qdrant, a `vN.json` file
@@ -108,46 +115,64 @@ In CI, `.github/workflows/eval.yml` runs the same evaluation (`--chain`, k =
 the eval set, against the serving index, and fails the check below recall@3
 0.8 or 0.9 right decisions.
 
-First run (k = 3, `gpt-oss:120b`): recall@3 0.94, hit rate@3 0.94, MRR 0.81,
-precision@3 0.31 (the ceiling is 0.33: one relevant document per question),
-answer decisions 19/20 right, latency p50 1.07 s and p95 1.65 s.
+Results at k = 3 with `gpt-oss:120b`, each version scored before promotion:
 
-Known limitation: short English questions over Spanish documents rank lower.
-"Do you ship to Argentina?" puts `envios.txt` fourth (0.783 against 0.792 for
-the first), so at k = 3 the chain never sees it and refuses. The API's default
-`top_k` of 5 covers it; a stronger multilingual embedding model would fix it at
-the source.
+| Index | Questions | recall@3 | MRR | Right decisions | p95 |
+|---|---|---|---|---|---|
+| 6 documents, dense (v1.0) | 20 | 0.938 | 0.812 | 19/20 | 1.65 s |
+| 14 documents, dense | 56 | 0.862 | 0.738 | 52/56 | 1.60 s |
+| 14 documents, dense + translations (v1.1) | 56 | **0.968** | **0.869** | **55/56** | 1.51 s |
 
-On the 14-document set (v1.1), dense retrieval scores recall@3 0.862, MRR
-0.738 and 52/56 right decisions. Every miss is a question in one language
-about a document in the other: the right document is not in the top five, and
-the chain then refuses, correctly given what it saw.
+On the larger set every dense miss was cross-language: a Spanish question
+about an English document or the reverse ranked the right document outside
+the top five, and the chain then refused, correctly given what it saw.
+Translating the chunks at index time recovered them.
+
+**Tried and rejected: hybrid search.** Adding a BM25 sparse vector
+(`qdrant/bm25`, free on Cloud Inference) and fusing it with the dense one
+lowered recall@3 on the same 47 answerable questions, whatever the fusion:
+
+| Retrieval | recall@3 | MRR | SKU lookups ranked first |
+|---|---|---|---|
+| Dense | **0.862** | **0.738** | 3/5 |
+| Dense + BM25, RRF (20 + 20 candidates) | 0.777 | 0.709 | 3/5 |
+| Dense + BM25, DBSF | 0.755 | 0.709 | 4/5 |
+| Dense + BM25, RRF (20 + 5) | 0.777 | 0.730 | 4/5 |
+| Dense, then BM25 rerank | 0.713 | 0.688 | 4/5 |
+
+Exact-token matching helps codes like `NR-2210` a little, but in a bilingual
+corpus with short questions it pulls same-language noise above the right
+passage. Cross-language recall was the real gap, and translation closed it.
 
 ### RAG against the model alone
 
 `scripts/compare.py` asks every labelled question twice with the same model:
 through the chain, and alone (told it may say it does not know). An LLM judge
 grades each answer to an answerable question against its reference answer in
-`eval/questions.jsonl`, on facts only; for the four questions the corpus cannot
+`eval/questions.jsonl`, on facts only; for the questions the corpus cannot
 answer, refusing is right and any answer counts as a hallucination.
 
-| `gpt-oss:120b`, 20 questions | RAG (k = 5) | Model alone |
+| `gpt-oss:120b`, 56 questions (v1.1) | RAG (k = 5) | Model alone |
 |---|---|---|
-| Correct answers (16 answerable) | **100%** | 19% |
-| Refused although answerable | 0% | 69% |
-| Refused the 4 unanswerable | **100%** | 75% |
-| Hallucinated (of all 20) | **0%** | 15% |
-| Latency p50 / p95 | 1.25 s / 2.50 s | 0.97 s / 2.05 s |
-| Prompt tokens, average | 906 | 136 |
+| Correct answers (47 answerable) | **100%** | 19% |
+| Refused although answerable | 0% | 75% |
+| Refused the 9 unanswerable | **100%** | 100% |
+| Hallucinated (of all 56) | **0%** | 5% |
+| Latency p50 / p95 | 1.32 s / 1.62 s | 0.94 s / 1.33 s |
+| Prompt tokens, average | 936 | 136 |
+
+On the first 20-question set the model alone scored 19–25% correct and 10–15%
+hallucinated across runs; read its column as a range.
 
 The model alone mostly refuses, which is the honest failure: it cannot know a
-fictional store's policies. Where it does answer it guesses — that Norte Retail
-has physical stores, where the data is stored, what to do with a late order.
+fictional store's policies. Where it does answer it guesses — where the data is
+stored, what happens after five failed sign-ins, how price matching works.
 Retrieval buys correctness and grounded refusals for about 0.3 s and 770
 prompt tokens per question.
 
-Read it with its limits: 20 questions over 6 short documents, and the judge is
-the same model that answers. The first judge prompt also failed a correct
+Read it with its limits: 56 questions over 14 short documents, and the judge is
+the same model that answers; one RAG answer was first failed because the
+reference answer added a fact from another question, fixed in the reference. The first judge prompt also failed a correct
 answer for being in the wrong language; it now grades facts only, and that
 answer ("12 months", given in Spanish to an English question) exposed a real
 slip: over Spanish passages the model followed the passages' language in 6 of
