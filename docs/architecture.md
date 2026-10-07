@@ -53,16 +53,44 @@ evaluation passes (the evaluation arrives with F5):
 uv run python -c "from rag.retrievers import QdrantRetriever; QdrantRetriever().promote('<version>')"
 ```
 
-## Evaluation *(planned)*
+## Evaluation
 
 Each query writes one `rag_query` JSON line (`monitoring.log_query`): status,
 total, retrieval and generation latency, top score, passages and sources,
 prompt and completion tokens, model. On Lambda it lands in CloudWatch Logs and
 the Grafana dashboard reads it with Logs Insights; nothing on the request path
-calls a metrics service. On top of that, an offline evaluation runs
-precision@k and recall@k over a labelled question set and records the run in
-the shared MLflow, which is what turns "the answers feel better" into a number
-attached to a pull request.
+calls a metrics service.
+
+On top of that, `scripts/evaluate.py` turns "the answers feel better" into a
+number attached to a pull request. It scores 20 labelled questions
+(`eval/questions.jsonl`, 16 answerable and 4 the corpus cannot answer, in
+Spanish and English) over the fictional `eval/corpus/`:
+
+- **Retrieval**, at document level: precision@k, recall@k, hit rate@k, MRR.
+- **Answers** (`--chain`): whether the chain answered the answerable questions
+  and refused the rest, and latency p50/p95.
+
+The run is recorded in the shared MLflow (experiment `document-rag-assistant`).
+With `--version` it scores a collection that is not serving yet, and
+`--promote` moves the alias to it only when recall@k reaches `--min-recall`
+(0.8 by default):
+
+```bash
+uv run --env-file .env python scripts/index_docs.py eval/corpus   # prints the version
+MLFLOW_TRACKING_URI=<shared mlflow url> \
+MLFLOW_TRACKING_TOKEN=$(gcloud auth print-identity-token) \
+uv run --env-file .env python scripts/evaluate.py --version <version> --chain --promote
+```
+
+First run (k = 3, `gpt-oss:120b`): recall@3 0.94, hit rate@3 0.94, MRR 0.81,
+precision@3 0.31 (the ceiling is 0.33: one relevant document per question),
+answer decisions 19/20 right, latency p50 1.07 s and p95 1.65 s.
+
+Known limitation: short English questions over Spanish documents rank lower.
+"Do you ship to Argentina?" puts `envios.txt` fourth (0.783 against 0.792 for
+the first), so at k = 3 the chain never sees it and refuses. The API's default
+`top_k` of 5 covers it; a stronger multilingual embedding model would fix it at
+the source.
 
 ## Failure behaviour
 

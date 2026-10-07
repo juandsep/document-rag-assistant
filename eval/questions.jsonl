@@ -1,0 +1,20 @@
+{"q": "¿Cuántos días tengo para devolver un producto?", "relevant": ["devoluciones.txt"]}
+{"q": "¿Puedo devolver una tarjeta de regalo?", "relevant": ["devoluciones.txt"]}
+{"q": "Can I return something 45 days after delivery?", "relevant": ["devoluciones.txt"]}
+{"q": "¿Cuánto tarda en llegar el reembolso?", "relevant": ["devoluciones.txt"]}
+{"q": "¿Cuánto cuesta el envío si compro 100.000 COP?", "relevant": ["envios.txt"]}
+{"q": "Do you ship to Argentina?", "relevant": ["envios.txt"]}
+{"q": "¿Qué hago si mi pedido no ha llegado después de 10 días?", "relevant": ["envios.txt"]}
+{"q": "How long is the warranty on a laptop?", "relevant": ["garantia.txt"]}
+{"q": "¿La garantía cubre daños por humedad?", "relevant": ["garantia.txt"]}
+{"q": "Is support available on Sunday?", "relevant": ["soporte.txt"]}
+{"q": "¿Puedo llamar por teléfono si mi pedido es de 500.000 COP?", "relevant": ["soporte.txt"]}
+{"q": "Can I pay in installments with a debit card?", "relevant": ["pagos.txt"]}
+{"q": "¿Aceptan pago contra entrega?", "relevant": ["pagos.txt"]}
+{"q": "How do I get an invoice in my company's name?", "relevant": ["pagos.txt"]}
+{"q": "Where is my personal data stored?", "relevant": ["privacidad.txt"]}
+{"q": "¿Si borro mi cuenta se borran mis facturas?", "relevant": ["privacidad.txt"]}
+{"q": "¿Quién es el gerente general de Norte Retail?", "relevant": []}
+{"q": "Does Norte Retail have physical stores?", "relevant": []}
+{"q": "¿Cuál fue la facturación del año pasado?", "relevant": []}
+{"q": "Do you offer a loyalty points program?", "relevant": []}
