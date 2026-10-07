@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "One question, end to end",
+    "viewBox": [1060, 540],
+    "column_fit": "spread",
+    "quality_profile": "showcase"
+  },
+  "participants": [
+    { "id": "user", "type": "external", "label": "Reader", "sublabel": "browser" },
+    { "id": "ui", "type": "frontend", "label": "Streamlit UI", "sublabel": "Community Cloud" },
+    { "id": "api", "type": "backend", "label": "Lambda API", "sublabel": "chain.py", "brand": "fastapi" },
+    { "id": "qdrant", "type": "database", "label": "Qdrant Cloud", "sublabel": "e5 embeddings" },
+    { "id": "llm", "type": "external", "label": "Ollama Cloud", "sublabel": "gpt-oss:120b", "brand": "ollama" },
+    { "id": "logs", "type": "cloud", "label": "CloudWatch", "sublabel": "Logs Insights" }
+  ],
+  "segments": [
+    { "from": 150, "to": 205, "label": "Request" },
+    { "from": 215, "to": 265, "label": "Retrieve" },
+    { "from": 275, "to": 325, "label": "Generate" },
+    { "from": 335, "to": 420, "label": "Respond" }
+  ],
+  "messages": [
+    { "id": "ask", "from": "user", "to": "ui", "y": 165, "label": "question" },
+    { "id": "query", "from": "ui", "to": "api", "y": 192, "label": "POST /query + X-API-Key", "variant": "emphasis" },
+    { "id": "search", "from": "api", "to": "qdrant", "y": 225, "label": "embed + search alias, top-k" },
+    { "id": "passages", "from": "qdrant", "to": "api", "y": 253, "label": "passages + scores", "variant": "return" },
+    { "id": "prompt", "from": "api", "to": "llm", "y": 285, "label": "numbered passages + question", "variant": "emphasis" },
+    { "id": "reply", "from": "llm", "to": "api", "y": 313, "label": "answer citing [n] or NO_CONTEXT", "variant": "return" },
+    { "id": "log", "from": "api", "to": "logs", "y": 345, "label": "rag_query JSON line", "variant": "dashed" },
+    { "id": "response", "from": "api", "to": "ui", "y": 375, "label": "answer, cited sources, status", "variant": "return" },
+    { "id": "render", "from": "ui", "to": "user", "y": 405, "label": "answer + sources", "variant": "return" }
+  ],
+  "activations": [
+    { "participant": "ui", "from": 160, "to": 411, "type": "frontend" },
+    { "participant": "api", "from": 187, "to": 381, "type": "backend" },
+    { "participant": "qdrant", "from": 220, "to": 259, "type": "database" },
+    { "participant": "llm", "from": 280, "to": 319, "type": "external" },
+    { "participant": "logs", "from": 340, "to": 351, "type": "cloud" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "Grounded", "items": ["The model sees only the retrieved passages", "Sources are the passages it cited"] },
+    { "dot": "rose", "title": "Refuses instead of guessing", "items": ["NO_CONTEXT becomes status insufficient_context", "Qdrant down: 503; LLM down: passages still returned"] },
+    { "dot": "emerald", "title": "Measured", "items": ["Warm: ~0.6 s in the Lambda, mostly generation", "One log line per query feeds Grafana"] }
+  ]
+}
