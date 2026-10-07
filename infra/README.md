@@ -8,7 +8,7 @@ Terraform (`aws` `~> 6.0`) provisioning the resources the service needs:
 | Lambda Function URL | HTTPS entry point with no load balancer and no domain of your own |
 | Amazon ECR | image registry CI pushes to |
 | Amazon S3 | document corpus (versioned, encrypted, public access blocked) |
-| SSM Parameter Store (SecureString) | Ollama token, vector store key and MLflow URI |
+| SSM Parameter Store (SecureString) | Qdrant and Ollama Cloud API keys |
 | IAM roles | function role (corpus read + own parameter read) and deploy role (GitHub Actions through OIDC, no stored access keys) |
 | CloudWatch Logs | one log group, 14-day retention |
 | CloudWatch alarms + SNS | errors, throttles and p95 latency, mailed to `alert_email` |
@@ -71,14 +71,16 @@ can spend even if someone finds it.
    mails a confirmation link for the alarm topic; alarms reach nobody until it
    is clicked. Set `qdrant_url` there too: the Qdrant Cloud cluster URL. Its
    API key goes in the SecureString (step 5), never in a `.tfvars`.
-2. `ollama_base_url` defaults to `http://localhost:11434`, which is only right
-   for a local run: Lambda cannot reach a laptop. It has to point at an endpoint
-   reachable from the internet, and that endpoint should require a token
-   (`OLLAMA_API_KEY`), because an open Ollama server is an open proxy to the
-   hardware it runs on.
-3. `function_url_auth_type` defaults to `AWS_IAM`: callers sign with SigV4 and
-   nobody can spend model time by accident. Set it to `NONE` only for a public
-   demo, and know that the URL then accepts anyone.
+2. `ollama_base_url` defaults to Ollama Cloud (`https://ollama.com`) and
+   `ollama_model` to `gpt-oss:120b`. The Ollama Cloud key goes in the
+   SecureString as `OLLAMA_API_KEY` (step 5). A self-hosted Ollama works too, as
+   long as Lambda can reach it and it asks for a token: an open Ollama server is
+   an open proxy to the hardware it runs on.
+3. `function_url_auth_type` defaults to `NONE`: the URL is public so the
+   Streamlit UI can call it, and `/query` demands the `API_KEY` from the
+   SecureString in an `X-API-Key` header (generate one with
+   `openssl rand -hex 32`). `reserved_concurrency` and the budget cap what a
+   leaked key could spend. `AWS_IAM` makes callers sign with SigV4 instead.
 4. The account gets an IAM provider for `token.actions.githubusercontent.com`.
    AWS allows one per account: if it already exists, set
    `create_github_oidc_provider = false` or apply fails with
@@ -93,20 +95,46 @@ can spend even if someone finds it.
    ```
 
    Leave `OLLAMA_API_KEY` as `""` when the endpoint needs no token. The app
-   will read the parameter through `APP_SECRET_PARAMETER`, which is already in
+   reads the parameter through `APP_SECRET_PARAMETER`, which is already in
    the function's environment.
-6. Take `deploy_role_arn` from the outputs and set it as the
-   `AWS_DEPLOY_ROLE` repository variable for the deploy workflow.
-7. `image_tag` must exist in ECR before the function can start: `bootstrap` is
-   only there so the first apply has something to point at.
+6. Set the deploy workflow's repository variables from the outputs:
 
-## Calling a private Function URL
+   ```bash
+   gh variable set AWS_DEPLOY_ROLE --body "$(terraform output -raw deploy_role_arn)"
+   gh variable set ECR_REPOSITORY  --body "$(terraform output -raw ecr_repository_url)"
+   gh variable set LAMBDA_FUNCTION --body "$(terraform output -raw function_name)"
+   gh variable set FUNCTION_URL    --body "$(terraform output -raw function_url)"
+   ```
+
+   From then on every push to `dev` builds the image, pushes it to ECR, rolls
+   it out and checks `/health` (`.github/workflows/deploy.yml`).
+7. The function needs its image in ECR before it can be created, so the
+   first apply runs in two steps:
+
+   ```bash
+   terraform apply -target=aws_ecr_repository.app -target=aws_ecr_lifecycle_policy.app
+   REPO=$(terraform output -raw ecr_repository_url)
+   aws ecr get-login-password | docker login --username AWS --password-stdin "${REPO%%/*}"
+   docker build --provenance=false --sbom=false --platform linux/amd64 \
+     -f ../docker/Dockerfile -t "$REPO:bootstrap" .. && docker push "$REPO:bootstrap"
+   terraform apply
+   ```
+
+   After that, `deploy.yml` ships every image.
+8. A new account's Lambda concurrency limit is 10, and AWS keeps 10
+   unreserved, so any `reserved_concurrency` above 0 fails. Set it to `-1`
+   (the account limit then caps the function at 10) or raise the "Concurrent
+   executions" quota in Service Quotas first.
+9. `github_repo` is GitHub's immutable OIDC subject (`owner@id/name@id`), not
+   `owner/name`: tokens carry the ids, and a trust on the name alone fails with
+   `Not authorized to perform sts:AssumeRoleWithWebIdentity`.
+
+## Calling the Function URL
 
 ```bash
-curl --aws-sigv4 "aws:amz:us-east-1:lambda" \
-     --user "$AWS_ACCESS_KEY_ID:$AWS_SECRET_ACCESS_KEY" \
-     -X POST "$(terraform output -raw function_url)" \
-     -H "content-type: application/json" -d '{"q": "What is the return policy?"}'
+curl -X POST "$(terraform output -raw function_url)query" \
+     -H "content-type: application/json" -H "X-API-Key: $API_KEY" \
+     -d '{"q": "What is the return policy?"}'
 ```
 
 ## Configuration
@@ -121,11 +149,12 @@ git-ignored `.env`.
 | `LOCAL_INDEX_DIR` | directory of the `local` index versions (default `index/`) |
 | `QDRANT_URL` / `QDRANT_API_KEY` | Qdrant Cloud cluster and its key |
 | `QDRANT_ALIAS` | alias queries go through (default `document-rag`) |
-| `MLFLOW_TRACKING_URI` | tracking backend |
-| `OLLAMA_BASE_URL` / `OLLAMA_MODEL` / `OLLAMA_API_KEY` | Ollama endpoint, generation model and bearer token |
+| `MLFLOW_TRACKING_URI` / `MLFLOW_TRACKING_TOKEN` | shared MLflow server, for offline evaluation runs only (never set on Lambda) |
+| `OLLAMA_BASE_URL` / `OLLAMA_MODEL` / `OLLAMA_API_KEY` | Ollama endpoint (local default `http://localhost:11434`, deployed `https://ollama.com`), generation model (default `gpt-oss:120b`) and bearer token |
 | `EMBEDDING_MODEL` | embedding model the `local` backend asks Ollama for |
-| `APP_SECRET_PARAMETER` | SecureString the function will read its keys from (not read yet, see F3) |
-| `RAG_API_URL` | API base URL consumed by the UI |
+| `APP_SECRET_PARAMETER` | SecureString whose JSON keys the API copies into its environment at startup (Lambda only; local runs use `.env`) |
+| `API_KEY` | key `/query` demands in `X-API-Key` (SecureString on Lambda; unset locally leaves the API open) |
+| `RAG_API_URL` / `RAG_API_KEY` | API base URL and key the Streamlit UI sends |
 
 ## Conventions
 

@@ -46,7 +46,7 @@ variable "environment" {
 }
 
 variable "image_tag" {
-  description = "Tag of the image the function runs. CI rewrites it on every deploy; `bootstrap` before the first one."
+  description = "Image tag for the first apply only (`bootstrap`). deploy.yml rolls out every later image, and the function ignores this after creation."
   type        = string
   default     = "bootstrap"
 }
@@ -69,21 +69,15 @@ variable "qdrant_url" {
 }
 
 variable "ollama_base_url" {
-  description = "Ollama HTTP API the chain calls. Must be reachable from Lambda: the localhost default only works for a local run."
+  description = "Ollama HTTP API the chain calls: Ollama Cloud by default. Its key goes in the SecureString as OLLAMA_API_KEY."
   type        = string
-  default     = "http://localhost:11434"
+  default     = "https://ollama.com"
 }
 
 variable "ollama_model" {
-  description = "Model the chain generates with."
+  description = "Model the chain generates with, on Ollama Cloud's free plan. gpt-oss:120b keeps the question's language when the passages are in another one, which gpt-oss:20b does not reliably."
   type        = string
-  default     = "llama3.1:8b"
-}
-
-variable "embedding_model" {
-  description = "Embedding model served by the same Ollama API, used at index time and at query time."
-  type        = string
-  default     = "nomic-embed-text"
+  default     = "gpt-oss:120b"
 }
 
 variable "lambda_memory_mb" {
@@ -115,9 +109,9 @@ variable "reserved_concurrency" {
 }
 
 variable "function_url_auth_type" {
-  description = "AWS_IAM keeps the endpoint private (callers sign with SigV4); NONE makes it public, so anyone with the URL can spend model time on the Ollama host."
+  description = "NONE (default) makes the URL public so the Streamlit UI can call it; /query still demands the API_KEY from the SecureString in an X-API-Key header. AWS_IAM makes callers sign with SigV4 instead."
   type        = string
-  default     = "AWS_IAM"
+  default     = "NONE"
 
   validation {
     condition     = contains(["AWS_IAM", "NONE"], var.function_url_auth_type)
@@ -137,9 +131,9 @@ variable "alert_email" {
 }
 
 variable "github_repo" {
-  description = "owner/name of the repository allowed to deploy."
+  description = "Repository allowed to deploy, as GitHub's immutable OIDC subject prefix names it: owner@owner_id/name@repo_id. Read it with `gh api repos/<owner>/<name>/actions/oidc/customization/sub` (sub_claim_prefix, without `repo:`). The ids keep a renamed or recreated repository from inheriting the role."
   type        = string
-  default     = "juandsep/document-rag-assistant"
+  default     = "juandsep@30062465/document-rag-assistant@1396685576"
 }
 
 variable "github_branch" {
@@ -167,8 +161,8 @@ variable "rag_secret_json" {
   default     = <<-JSON
     {
       "QDRANT_API_KEY": "REPLACE_ME",
-      "OLLAMA_API_KEY": "",
-      "MLFLOW_TRACKING_URI": "REPLACE_ME"
+      "OLLAMA_API_KEY": "REPLACE_ME",
+      "API_KEY": "REPLACE_ME"
     }
   JSON
 }
@@ -184,7 +178,6 @@ locals {
     QDRANT_URL           = var.qdrant_url
     OLLAMA_BASE_URL      = var.ollama_base_url
     OLLAMA_MODEL         = var.ollama_model
-    EMBEDDING_MODEL      = var.embedding_model
     APP_SECRET_PARAMETER = aws_ssm_parameter.app.name
 
     # The adapter in docker/Dockerfile forwards to the port the image listens on.

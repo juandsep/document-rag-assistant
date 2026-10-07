@@ -13,9 +13,8 @@ from them, and returns them as sources. Every change to chunking, embeddings or
 the retriever is measured with precision@k / recall@k instead of guessed. It
 runs on AWS for about $0.10/month idle, plus LLM tokens.
 
-> **Work in progress.** Chunking and the local index work; the RAG chain does
-> not yet, so `/query` returns a stub answer. Status, decisions and blockers:
-> [PLAN.md](PLAN.md).
+> **Live on AWS** (Lambda, `us-east-1`); the API needs an `X-API-Key`. The
+> public Streamlit UI is next. Status and decisions: [PLAN.md](PLAN.md).
 
 ## How it works
 
@@ -33,7 +32,8 @@ balancer, no VPC, nothing billed while idle. Qdrant Cloud embeds and indexes the
 chunks on its free tier with a multilingual model. The LLM is Ollama
 Cloud. Credentials sit in an SSM SecureString. A local Grafana reads
 CloudWatch for latency, errors and spend; the portfolio's shared MLflow keeps
-the evaluation runs. The Streamlit UI runs locally against the deployed API.
+the evaluation runs. The Streamlit UI runs on Streamlit Community Cloud and
+calls the API with a key.
 
 ## Documentation
 
@@ -54,7 +54,7 @@ uv sync
 uv run pytest -q
 uv run ruff check . && uv run ruff format --check .
 uv run rag                                        # API on http://localhost:8000
-uv run python scripts/index_docs.py <corpus-dir>
+uv run --env-file .env python scripts/index_docs.py <corpus-dir>   # .txt .md .pdf .docx
 uv run streamlit run src/rag/ui.py
 ```
 

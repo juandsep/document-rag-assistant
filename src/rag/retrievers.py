@@ -14,7 +14,6 @@ import json
 import math
 import os
 import re
-import urllib.request
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -22,6 +21,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Protocol
 
+from rag import ollama
 from rag.ingest import Chunk
 
 Embedder = Callable[[list[str]], list[list[float]]]
@@ -32,6 +32,7 @@ class Retrieved:
     doc_id: str
     text: str
     score: float
+    page: int | None = None
 
 
 class Retriever(Protocol):
@@ -42,16 +43,8 @@ class Retriever(Protocol):
 
 def ollama_embed(texts: list[str]) -> list[list[float]]:
     """Embed `texts` with `EMBEDDING_MODEL` through Ollama's `/api/embed`."""
-    base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
-    headers = {"Content-Type": "application/json"}
-    if api_key := os.getenv("OLLAMA_API_KEY"):
-        headers["Authorization"] = f"Bearer {api_key}"
-    body = {"model": os.getenv("EMBEDDING_MODEL", "nomic-embed-text"), "input": texts}
-    request = urllib.request.Request(
-        f"{base_url}/api/embed", data=json.dumps(body).encode(), headers=headers
-    )
-    with urllib.request.urlopen(request, timeout=60) as response:
-        return json.load(response)["embeddings"]
+    model = os.getenv("EMBEDDING_MODEL", "nomic-embed-text")
+    return ollama.post("/api/embed", {"model": model, "input": texts})["embeddings"]
 
 
 def _cosine(a: list[float], b: list[float]) -> float:
@@ -77,7 +70,7 @@ class LocalRetriever:
     def upsert(self, chunks: list[Chunk]) -> str:
         vectors = self.embed([chunk.text for chunk in chunks]) if chunks else []
         rows = [
-            {"doc_id": c.doc_id, "index": c.index, "text": c.text, "vector": v}
+            {"doc_id": c.doc_id, "page": c.page, "text": c.text, "vector": v}
             for c, v in zip(chunks, vectors, strict=True)
         ]
         versions = self._versions()
@@ -100,7 +93,9 @@ class LocalRetriever:
         # move to a real backend when queries get slow.
         scored = sorted(
             (
-                Retrieved(r["doc_id"], r["text"], _cosine(vector, r["vector"]))
+                Retrieved(
+                    r["doc_id"], r["text"], _cosine(vector, r["vector"]), r.get("page")
+                )
                 for r in rows
             ),
             key=lambda hit: hit.score,
@@ -137,6 +132,8 @@ class QdrantRetriever:
                 url=os.environ["QDRANT_URL"],
                 api_key=os.environ["QDRANT_API_KEY"],
                 cloud_inference=True,
+                # Skips a version round trip on every cold start.
+                check_compatibility=False,
             )
         return self._client
 
@@ -160,7 +157,7 @@ class QdrantRetriever:
                 id=str(uuid.uuid5(uuid.NAMESPACE_URL, f"{c.doc_id}#{c.index}")),
                 # e5 models are trained with these prefixes on each side.
                 vector=self._document(f"passage: {c.text}"),
-                payload={"doc_id": c.doc_id, "text": c.text},
+                payload={"doc_id": c.doc_id, "page": c.page, "text": c.text},
             )
             for c in chunks
         ]
@@ -196,6 +193,28 @@ class QdrantRetriever:
         )
         self.client.update_collection_aliases(operations)
 
+    def prune(self, keep_previous: int = 1, dry_run: bool = True) -> list[str]:
+        """Delete old versions; return the names deleted (or to delete).
+
+        Keeps the serving version, every newer one (candidates still waiting
+        for their evaluation) and the `keep_previous` newest older ones, so a
+        rollback is one `promote` away.
+        """
+        serving = self._serving()
+        if serving is None:
+            raise LookupError(f"Alias {self.alias!r} points nowhere; nothing to keep")
+        prefix = f"{self.alias}-v"
+        older = sorted(
+            (c.name for c in self.client.get_collections().collections),
+            reverse=True,
+        )
+        older = [name for name in older if name.startswith(prefix) and name < serving]
+        doomed = older[keep_previous:]
+        if not dry_run:
+            for name in doomed:
+                self.client.delete_collection(name)
+        return doomed
+
     def query(self, text: str, top_k: int = 5) -> list[Retrieved]:
         response = self.client.query_points(
             self.alias,
@@ -204,7 +223,9 @@ class QdrantRetriever:
             with_payload=True,
         )
         return [
-            Retrieved(p.payload["doc_id"], p.payload["text"], p.score)
+            Retrieved(
+                p.payload["doc_id"], p.payload["text"], p.score, p.payload.get("page")
+            )
             for p in response.points
         ]
 

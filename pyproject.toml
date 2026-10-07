@@ -8,6 +8,7 @@ authors = [
 ]
 requires-python = ">=3.11"
 dependencies = [
+    "boto3>=1.43.108",
     "fastapi>=0.142.0",
     "qdrant-client>=1.19.1",
     "uvicorn>=0.54.0",
@@ -22,8 +23,9 @@ build-backend = "uv_build"
 
 [tool.uv]
 # Local `uv sync` installs everything; the image installs none of these groups
-# (docker/Dockerfile), so it ships without Streamlit or MLflow.
-default-groups = ["dev", "ui", "eval"]
+# (docker/Dockerfile), so it ships without Streamlit, MLflow or the PDF/DOCX
+# parsers, which only run when indexing.
+default-groups = ["dev", "ui", "eval", "ingest"]
 
 [dependency-groups]
 dev = [
@@ -34,6 +36,10 @@ dev = [
 ]
 eval = [
     "mlflow>=3.16.1",
+]
+ingest = [
+    "pypdf>=6.19.0",
+    "python-docx>=1.2.0",
 ]
 ui = [
     "streamlit>=1.65.0",

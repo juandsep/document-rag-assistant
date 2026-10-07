@@ -1,0 +1,5 @@
+# Dependencies for Streamlit Community Cloud, which deploys this file as the
+# app (entrypoint src/rag/ui.py) and reads the dependency file next to it
+# before the repository root uv.lock, so the UI installs only what it imports.
+streamlit==1.65.0
+requests>=2.32

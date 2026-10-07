@@ -4,15 +4,14 @@ environment = "staging"
 alert_email = "you@example.com"
 
 # Only uncomment what differs from the defaults in main.tf: project, region,
-# image_tag, vector_backend, qdrant_url, ollama_base_url, ollama_model, embedding_model,
+# image_tag, vector_backend, qdrant_url, ollama_base_url, ollama_model,
 # lambda_memory_mb, lambda_timeout_s, reserved_concurrency,
 # function_url_auth_type, monthly_budget_usd, github_repo, github_branch,
 # github_oidc_thumbprint, create_github_oidc_provider.
 
-# The default is localhost, which Lambda cannot reach: point this at an
-# endpoint that is reachable from AWS and that asks for a token.
-# ollama_base_url = "https://ollama.example.com"
-# ollama_model    = "llama3.1:8b"
+# Ollama Cloud by default; its key goes in the SecureString as OLLAMA_API_KEY.
+# ollama_base_url = "https://ollama.com"
+# ollama_model    = "gpt-oss:120b"
 
 # AWS_IAM (default) keeps the endpoint private. NONE makes it public: anyone
 # with the URL can then spend model time on the Ollama host.
@@ -30,7 +29,7 @@ alert_email = "you@example.com"
 # rag_secret_json = <<-JSON
 #   {
 #     "QDRANT_API_KEY": "...",
-#     "OLLAMA_API_KEY": "",
-#     "MLFLOW_TRACKING_URI": "..."
+#     "OLLAMA_API_KEY": "...",
+#     "API_KEY": "..."
 #   }
 # JSON

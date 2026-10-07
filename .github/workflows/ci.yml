@@ -24,7 +24,7 @@ jobs:
       - name: Lint
         run: uv run ruff check . && uv run ruff format --check .
       - name: Test
-        run: uv run pytest -q --cov --cov-report=term-missing
+        run: uv run pytest -q --cov --cov-report=term-missing --cov-fail-under=80
 
   docker:
     runs-on: ubuntu-latest
