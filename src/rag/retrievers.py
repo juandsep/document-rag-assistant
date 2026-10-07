@@ -48,6 +48,22 @@ def ollama_embed(texts: list[str]) -> list[list[float]]:
     return ollama.post("/api/embed", {"model": model, "input": texts})["embeddings"]
 
 
+def _point_key(chunk: Chunk) -> str:
+    """Stable id per chunk and per searchable form (original or translation)."""
+    return f"{chunk.doc_id}#{chunk.index}" + ("#tr" if chunk.search_text else "")
+
+
+def _distinct(hits: list[Retrieved], top_k: int) -> list[Retrieved]:
+    """Keep the best hit of each passage: its original and its translation
+    can both match, and the chain should see each passage once."""
+    seen, kept = set(), []
+    for hit in hits:
+        if (hit.doc_id, hit.text) not in seen:
+            seen.add((hit.doc_id, hit.text))
+            kept.append(hit)
+    return kept[:top_k]
+
+
 def _cosine(a: list[float], b: list[float]) -> float:
     norm = math.sqrt(sum(x * x for x in a)) * math.sqrt(sum(x * x for x in b))
     return sum(x * y for x, y in zip(a, b)) / norm if norm else 0.0
@@ -69,7 +85,9 @@ class LocalRetriever:
         return sorted(files, key=lambda p: int(p.stem[1:]))
 
     def upsert(self, chunks: list[Chunk]) -> str:
-        vectors = self.embed([chunk.text for chunk in chunks]) if chunks else []
+        vectors = (
+            self.embed([c.search_text or c.text for c in chunks]) if chunks else []
+        )
         rows = [
             {"doc_id": c.doc_id, "page": c.page, "text": c.text, "vector": v}
             for c, v in zip(chunks, vectors, strict=True)
@@ -102,7 +120,7 @@ class LocalRetriever:
             key=lambda hit: hit.score,
             reverse=True,
         )
-        return scored[:top_k]
+        return _distinct(scored, top_k)
 
 
 class QdrantRetriever:
@@ -163,9 +181,9 @@ class QdrantRetriever:
         )
         points = [
             models.PointStruct(
-                id=str(uuid.uuid5(uuid.NAMESPACE_URL, f"{c.doc_id}#{c.index}")),
+                id=str(uuid.uuid5(uuid.NAMESPACE_URL, _point_key(c))),
                 # e5 models are trained with these prefixes on each side.
-                vector=self._document(f"passage: {c.text}"),
+                vector=self._document(f"passage: {c.search_text or c.text}"),
                 payload={"doc_id": c.doc_id, "page": c.page, "text": c.text},
             )
             for c in chunks
@@ -228,11 +246,11 @@ class QdrantRetriever:
     def query(self, text: str, top_k: int = 5) -> list[Retrieved]:
         body = {
             "query": {"text": f"query: {text}", "model": self.MODEL},
-            "limit": top_k,
+            "limit": top_k * 2,  # room for original + translation of a passage
             "with_payload": True,
         }
         points = self._http("POST", f"/collections/{self.alias}/points/query", body)
-        return [
+        hits = [
             Retrieved(
                 p["payload"]["doc_id"],
                 p["payload"]["text"],
@@ -241,6 +259,7 @@ class QdrantRetriever:
             )
             for p in points["result"]["points"]
         ]
+        return _distinct(hits, top_k)
 
 
 def _qdrant_rest(method: str, path: str, body: dict | None = None) -> dict:

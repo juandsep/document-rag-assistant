@@ -97,3 +97,30 @@ def test_unsupported_formats_fail_loudly(tmp_path):
     (tmp_path / "data.csv").write_text("a,b")
     with pytest.raises(ValueError, match="Unsupported"):
         load_pages(tmp_path / "data.csv")
+
+
+def test_with_translations_adds_a_copy_searchable_in_the_other_language():
+    from rag.ingest import Chunk, with_translations
+
+    chunks = [
+        Chunk("es.txt", 0, "La garantía dura 12 meses."),
+        Chunk("en.txt", 0, "Shipping takes 5 days."),
+    ]
+    calls = []
+
+    def translate(text, target):
+        calls.append(target)
+        return f"<{target}> {text}"
+
+    out = with_translations(chunks, translate)
+
+    assert calls == ["English", "Spanish"]
+    assert out[:2] == chunks
+    assert [(c.doc_id, c.text, c.search_text) for c in out[2:]] == [
+        (
+            "es.txt",
+            "La garantía dura 12 meses.",
+            "<English> La garantía dura 12 meses.",
+        ),
+        ("en.txt", "Shipping takes 5 days.", "<Spanish> Shipping takes 5 days."),
+    ]
