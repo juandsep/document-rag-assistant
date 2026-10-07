@@ -40,7 +40,7 @@ Each phase is one short-lived branch cut from `dev`, one pull request, one conce
 Live since 2026-10-07 in `us-east-1` (account `611581418226`, environment `staging`): `POST /query` behind the `X-API-Key`, deployed by `deploy.yml` on every push to `dev`. What it took, beyond the code:
 
 1. **AWS credentials** — IAM Identity Center (in `us-east-2`) with an `AdministratorAccess` permission set; the CLI profile `rag` logs in with `aws sso login --profile rag`. No long-lived keys anywhere; CI uses OIDC.
-2. **Keys** — Qdrant and Ollama Cloud keys plus the generated `API_KEY` live in the SSM SecureString, loaded from the git-ignored `.env`.
+2. **Keys** — the Ollama Cloud key, the generated `API_KEY` and a **read-only** Qdrant key (search and aliases answer 200, creating a collection 403) live in the SSM SecureString, loaded from the git-ignored `.env`. The read-write Qdrant key stays on the machine that indexes; the keepalive also uses the read-only one.
 3. **Lambda concurrency** — the new account's limit is 10 and AWS keeps 10 unreserved, so `reserved_concurrency = -1`; the account limit itself caps the function at 10 concurrent requests. Raise the quota before reserving any.
 4. **OIDC subject** — the repository signs its tokens with GitHub's immutable subject (`repo:owner@id/name@id:…`), which the deploy role now trusts.
 5. **Cold start** — init was 2.7 to 7.6 s, mostly importing `qdrant-client`, and memory did not help (1024 and 2048 MB measured alike). The API now queries Qdrant over REST and the client stays out of the image: init 1.3 to 1.7 s, image 101 → 70 MB. Warm queries answer in about 0.6 s inside the Lambda.
