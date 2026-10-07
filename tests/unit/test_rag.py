@@ -63,6 +63,12 @@ class _FakeQdrant:
         self.upserts += 1
         self.collections[name].extend(points)
 
+    def get_collections(self):
+        return NS(collections=[NS(name=n) for n in self.collections])
+
+    def delete_collection(self, name):
+        del self.collections[name]
+
     def get_aliases(self):
         return NS(
             aliases=[
@@ -118,3 +124,23 @@ def test_qdrant_retriever_embeds_with_e5_prefixes():
     assert point.vector.text == "passage: refund"
     assert point.vector.model == QdrantRetriever.MODEL
     assert point.payload == {"doc_id": "a.txt", "page": None, "text": "refund"}
+
+
+def test_qdrant_prune_keeps_serving_newer_candidates_and_one_rollback():
+    client = _FakeQdrant()
+    client.collections = {
+        n: [] for n in ["rag-v1", "rag-v2", "rag-v3", "rag-v4", "rag-v5", "other-v1"]
+    }
+    client.aliases = {"rag": "rag-v4"}
+    retriever = QdrantRetriever(client=client, alias="rag")
+
+    assert retriever.prune() == ["rag-v2", "rag-v1"]
+    assert len(client.collections) == 6  # dry run by default
+
+    retriever.prune(dry_run=False)
+    assert sorted(client.collections) == ["other-v1", "rag-v3", "rag-v4", "rag-v5"]
+
+
+def test_qdrant_prune_refuses_without_a_serving_version():
+    with pytest.raises(LookupError):
+        QdrantRetriever(client=_FakeQdrant(), alias="rag").prune()

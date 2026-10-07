@@ -193,6 +193,28 @@ class QdrantRetriever:
         )
         self.client.update_collection_aliases(operations)
 
+    def prune(self, keep_previous: int = 1, dry_run: bool = True) -> list[str]:
+        """Delete old versions; return the names deleted (or to delete).
+
+        Keeps the serving version, every newer one (candidates still waiting
+        for their evaluation) and the `keep_previous` newest older ones, so a
+        rollback is one `promote` away.
+        """
+        serving = self._serving()
+        if serving is None:
+            raise LookupError(f"Alias {self.alias!r} points nowhere; nothing to keep")
+        prefix = f"{self.alias}-v"
+        older = sorted(
+            (c.name for c in self.client.get_collections().collections),
+            reverse=True,
+        )
+        older = [name for name in older if name.startswith(prefix) and name < serving]
+        doomed = older[keep_previous:]
+        if not dry_run:
+            for name in doomed:
+                self.client.delete_collection(name)
+        return doomed
+
     def query(self, text: str, top_k: int = 5) -> list[Retrieved]:
         response = self.client.query_points(
             self.alias,
