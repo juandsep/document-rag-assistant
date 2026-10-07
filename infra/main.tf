@@ -75,9 +75,9 @@ variable "ollama_base_url" {
 }
 
 variable "ollama_model" {
-  description = "Model the chain generates with. deepseek-v4.1-flash, on the same API, is the fallback if this one is too slow."
+  description = "Model the chain generates with, on Ollama Cloud's free plan. gpt-oss:120b keeps the question's language when the passages are in another one, which gpt-oss:20b does not reliably."
   type        = string
-  default     = "gpt-oss:20b"
+  default     = "gpt-oss:120b"
 }
 
 variable "lambda_memory_mb" {

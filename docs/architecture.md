@@ -22,8 +22,9 @@ POST /query { q }
    between the two is the most common cause of silently bad retrieval.
 2. The retriever returns the top-k passages together with their scores.
 3. The prompt is built **only** from those passages, numbered `[1]..[k]`; the
-   model cites them as `[n]` and replies `NO_CONTEXT` when they do not hold the
-   answer (`chain.py`).
+   model cites them as `[n]`, answers in the question's language, and replies
+   `NO_CONTEXT:` with one sentence when they do not hold the answer
+   (`chain.py`).
 4. The response carries the passages the answer cites, so a reader can verify
    every claim.
 
@@ -63,7 +64,8 @@ what turns "the answers feel better" into a number attached to a pull request.
 - **Vector DB unavailable** — `/query` fails fast with `503`; answering without
   retrieval would produce uncited claims.
 - **Not enough context** — no passages, or the model replies `NO_CONTEXT`: the
-  answer says so and `status` is `insufficient_context`, rather than letting
+  answer says so in the question's language, with no sources, and `status` is
+  `insufficient_context`, rather than letting
   the model improvise.
 - **LLM unavailable** — the retrieved passages are returned with the error and
   `status: llm_unavailable`, so the caller still gets the evidence.

@@ -72,7 +72,7 @@ can spend even if someone finds it.
    is clicked. Set `qdrant_url` there too: the Qdrant Cloud cluster URL. Its
    API key goes in the SecureString (step 5), never in a `.tfvars`.
 2. `ollama_base_url` defaults to Ollama Cloud (`https://ollama.com`) and
-   `ollama_model` to `gpt-oss:20b`. The Ollama Cloud key goes in the
+   `ollama_model` to `gpt-oss:120b`. The Ollama Cloud key goes in the
    SecureString as `OLLAMA_API_KEY` (step 5). A self-hosted Ollama works too, as
    long as Lambda can reach it and it asks for a token: an open Ollama server is
    an open proxy to the hardware it runs on.
@@ -122,7 +122,7 @@ git-ignored `.env`.
 | `QDRANT_URL` / `QDRANT_API_KEY` | Qdrant Cloud cluster and its key |
 | `QDRANT_ALIAS` | alias queries go through (default `document-rag`) |
 | `MLFLOW_TRACKING_URI` | tracking backend |
-| `OLLAMA_BASE_URL` / `OLLAMA_MODEL` / `OLLAMA_API_KEY` | Ollama endpoint (local default `http://localhost:11434`, deployed `https://ollama.com`), generation model (default `gpt-oss:20b`) and bearer token |
+| `OLLAMA_BASE_URL` / `OLLAMA_MODEL` / `OLLAMA_API_KEY` | Ollama endpoint (local default `http://localhost:11434`, deployed `https://ollama.com`), generation model (default `gpt-oss:120b`) and bearer token |
 | `EMBEDDING_MODEL` | embedding model the `local` backend asks Ollama for |
 | `APP_SECRET_PARAMETER` | SecureString whose JSON keys the API copies into its environment at startup (Lambda only; local runs use `.env`) |
 | `RAG_API_URL` | API base URL consumed by the UI |

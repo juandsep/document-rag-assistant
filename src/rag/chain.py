@@ -21,10 +21,17 @@ NO_CONTEXT = "NO_CONTEXT"
 
 SYSTEM_PROMPT = f"""You answer business questions using only the numbered \
 passages you are given.
-- Cite every claim with the number of the passage it comes from, like [1].
-- If the passages do not contain the answer, reply with exactly {NO_CONTEXT} \
-and nothing else. Never answer from your own knowledge.
-- Answer in the language of the question, briefly."""
+Rules:
+1. Reply in the language the QUESTION is written in, never in the passages' \
+language when they differ. Translate what you use.
+2. Answer whenever the passages state the answer or let you deduce it. A rule \
+answers questions about cases it covers: "returns accepted up to 30 days" \
+answers "can I return after 45 days?" with a no, citing that passage.
+3. Cite every claim with its passage number, like [1].
+4. Only when no passage is about the question's topic, reply {NO_CONTEXT}: \
+followed by one short sentence in the question's language saying the \
+documents do not cover it.
+5. Never use knowledge from outside the passages. Be brief."""
 
 INSUFFICIENT = "The indexed documents do not contain enough information to answer this."
 
@@ -44,7 +51,7 @@ class Answer:
 def ollama_chat(messages: list[dict[str, str]]) -> str:
     """One non-streaming chat turn with `OLLAMA_MODEL`, temperature 0."""
     body = {
-        "model": os.getenv("OLLAMA_MODEL", "gpt-oss:20b"),
+        "model": os.getenv("OLLAMA_MODEL", "gpt-oss:120b"),
         "messages": messages,
         "stream": False,
         "options": {"temperature": 0},
@@ -58,7 +65,10 @@ def _prompt(question: str, passages: list[Retrieved]) -> list[dict[str, str]]:
     )
     return [
         {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user", "content": f"Passages:\n{context}\n\nQuestion: {question}"},
+        {
+            "role": "user",
+            "content": f"Passages:\n{context}\n\nQuestion: {question}",
+        },
     ]
 
 
@@ -84,12 +94,17 @@ def answer(
         return Answer(INSUFFICIENT, [], "insufficient_context")
 
     try:
+        # gpt-oss sometimes cites with full-width brackets; normalize to [n].
         reply = chat(_prompt(question, passages)).strip()
+        reply = reply.replace("【", "[").replace("】", "]")
     except Exception as exc:  # noqa: BLE001 - the passages are still evidence
         return Answer(
             f"The language model is unavailable: {exc}", passages, "llm_unavailable"
         )
 
     if NO_CONTEXT in reply:
-        return Answer(INSUFFICIENT, passages, "insufficient_context")
+        # Nothing backs a refusal, so no sources; keep the model's sentence,
+        # which is in the question's language.
+        sentence = reply.split(NO_CONTEXT, 1)[1].lstrip(" :").strip()
+        return Answer(sentence or INSUFFICIENT, [], "insufficient_context")
     return Answer(reply, _cited(reply, passages))

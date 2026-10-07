@@ -40,7 +40,13 @@ def test_answer_returns_only_the_cited_passages_and_prompts_from_them():
     assert [s.doc_id for s in result.sources] == ["refunds.txt"]
     user = seen["messages"][1]["content"]
     assert "[1] (refunds.txt)" in user and "[2] (shipping.txt)" in user
-    assert user.endswith("Question: How long for a refund?")
+    assert user.endswith("How long for a refund?")
+
+
+def test_answer_reads_full_width_citations():
+    result = chain.answer("q", retriever=FakeRetriever(), chat=lambda m: "No【1】.")
+    assert result.text == "No[1]."
+    assert [s.doc_id for s in result.sources] == ["refunds.txt"]
 
 
 def test_answer_without_citations_keeps_every_passage():
@@ -49,10 +55,19 @@ def test_answer_without_citations_keeps_every_passage():
 
 
 def test_answer_reports_insufficient_context_instead_of_improvising():
+    reply = f"{chain.NO_CONTEXT}: Los documentos no lo cubren."
     result = chain.answer(
-        "Who is the CEO?", retriever=FakeRetriever(), chat=lambda m: chain.NO_CONTEXT
+        "¿Quién es el CEO?", retriever=FakeRetriever(), chat=lambda m: reply
     )
     assert result.status == "insufficient_context"
+    assert result.text == "Los documentos no lo cubren."
+    assert result.sources == []
+
+
+def test_a_bare_no_context_reply_falls_back_to_the_default_message():
+    result = chain.answer(
+        "q", retriever=FakeRetriever(), chat=lambda m: chain.NO_CONTEXT
+    )
     assert result.text == chain.INSUFFICIENT
 
 

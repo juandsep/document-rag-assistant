@@ -11,7 +11,7 @@ alert_email = "you@example.com"
 
 # Ollama Cloud by default; its key goes in the SecureString as OLLAMA_API_KEY.
 # ollama_base_url = "https://ollama.com"
-# ollama_model    = "gpt-oss:20b"
+# ollama_model    = "gpt-oss:120b"
 
 # AWS_IAM (default) keeps the endpoint private. NONE makes it public: anyone
 # with the URL can then spend model time on the Ollama host.
