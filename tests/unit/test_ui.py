@@ -98,4 +98,4 @@ def test_the_page_explains_itself_before_any_question():
     assert [tab.label for tab in app.tabs] == ["Ask", "How it works", "Demo corpus"]
     assert app.sidebar.header[0].value == "About"
     corpus = app.table[1].value
-    assert len(corpus) == 6 and set(corpus["Language"]) == {"Spanish", "English"}
+    assert len(corpus) == 14 and {"Spanish", "English"} <= set(corpus["Language"])

@@ -9,8 +9,9 @@ answer comes from, and says so when the documents do not cover a question.
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 **[Try the live demo →](https://document-rag-assistant-portfolio.streamlit.app/)**
-Ask about the returns, shipping, warranty, support, payments or privacy policy
-of Norte Retail, a fictional store, in Spanish or English. The first question
+Ask about the policies, catalog and services of Norte Retail, a fictional
+store (14 documents: text, Markdown, a Word catalog and PDFs), in Spanish or
+English. The first question
 after a quiet spell waits a few seconds while the API wakes up.
 
 ## Why retrieval

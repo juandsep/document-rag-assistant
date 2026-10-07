@@ -29,17 +29,35 @@ EXAMPLES = [
     "Can I pay in installments with a debit card?",
     "¿La garantía cubre daños por humedad?",
     "Can I return something 45 days after delivery?",
+    "¿Cuánto cuesta el NR-2210?",
+    "What is the minimum wholesale order?",
     "Who is the CEO of Norte Retail?",
 ]
 
 # What the demo corpus holds; the documents live in eval/corpus/.
 CORPUS = [
     ("devoluciones.txt", "Spanish", "Returns: 30-day window, exclusions, refunds"),
-    ("envios.txt", "Spanish", "Shipping: times, costs, free threshold, countries"),
+    ("envios.txt", "Spanish", "Shipping in Colombia: times, costs, express"),
+    (
+        "envios-internacionales.md",
+        "English",
+        "Shipping abroad: 4 countries, flat fee, customs",
+    ),
     ("garantia.txt", "Spanish", "Warranty: 12 months electronics, 24 furniture"),
-    ("soporte.txt", "English", "Support: hours, phone line, response times"),
+    ("catalogo.docx", "Spanish", "Catalog table: SKU codes, prices, warranty"),
+    ("instalacion.pdf", "Spanish", "Assembly service: cities, prices, scheduling"),
+    ("mayoristas.pdf", "English", "Wholesale (2 pages): minimums, discounts, net 30"),
+    ("tarjetas-regalo.md", "Spanish", "Gift cards: values, 12-month validity, no cash"),
+    ("igualacion-precios.txt", "Spanish", "Price matching: conditions, 7-day window"),
     ("pagos.txt", "English", "Payments: cards, PSE, Nequi, installments, invoices"),
+    ("soporte.txt", "English", "Support: hours, phone line, response times"),
+    ("seguridad-cuenta.txt", "English", "Account security: 2FA, resets, fraud"),
     ("privacidad.txt", "English", "Privacy: where data lives, retention, deletion"),
+    (
+        "preguntas-frecuentes.md",
+        "Spanish/English",
+        "FAQ: address changes, cancellations, VAT",
+    ),
 ]
 
 st.set_page_config(page_title="Document RAG Assistant", page_icon="📚", layout="wide")
@@ -170,9 +188,9 @@ with how_tab:
 
 with corpus_tab:
     st.markdown(
-        "Six short policy documents of **Norte Retail**, a store made up for this "
-        "demo. Three are in Spanish and three in English; questions work in "
-        "either language."
+        "Fourteen documents of **Norte Retail**, a store made up for this demo: "
+        "plain text, Markdown, a Word catalog with a product table and two PDFs, "
+        "in Spanish and English. Questions work in either language."
     )
     st.table(
         {
@@ -182,8 +200,10 @@ with corpus_tab:
         }
     )
     st.markdown(
-        "**It should answer:** return windows, shipping costs and countries, "
-        "warranty terms, support hours, payment rules, where data is stored.\n\n"
-        "**It should refuse:** who runs the company, revenue, physical stores, "
-        "loyalty programs. None of that is in the documents."
+        "**It should answer:** returns, shipping and customs, product prices by "
+        "SKU, assembly, wholesale terms, gift cards, price matching, payments, "
+        "support, account security and privacy.\n\n"
+        "**It should refuse:** who runs the company, revenue, staff, founding "
+        "date, physical stores, loyalty programs, a mobile app, Black Friday "
+        "deals. None of that is in the documents."
     )
