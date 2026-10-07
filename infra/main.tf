@@ -161,8 +161,7 @@ variable "rag_secret_json" {
   default     = <<-JSON
     {
       "QDRANT_API_KEY": "REPLACE_ME",
-      "OLLAMA_API_KEY": "",
-      "MLFLOW_TRACKING_URI": "REPLACE_ME"
+      "OLLAMA_API_KEY": "REPLACE_ME"
     }
   JSON
 }

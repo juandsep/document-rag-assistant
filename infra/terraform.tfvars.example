@@ -29,7 +29,6 @@ alert_email = "you@example.com"
 # rag_secret_json = <<-JSON
 #   {
 #     "QDRANT_API_KEY": "...",
-#     "OLLAMA_API_KEY": "",
-#     "MLFLOW_TRACKING_URI": "..."
+#     "OLLAMA_API_KEY": "..."
 #   }
 # JSON

@@ -9,13 +9,22 @@ from __future__ import annotations
 
 import os
 import re
+import time
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from rag import ollama
 from rag.retrievers import Retrieved, Retriever, get_retriever
 
-Chat = Callable[[list[dict[str, str]]], str]
+
+@dataclass(frozen=True)
+class Reply:
+    text: str
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+
+
+Chat = Callable[[list[dict[str, str]]], Reply]
 
 NO_CONTEXT = "NO_CONTEXT"
 
@@ -46,9 +55,15 @@ class Answer:
     sources: list[Retrieved]
     # ok | insufficient_context | llm_unavailable
     status: str = "ok"
+    # What the per-query log line reports (see monitoring.log_query).
+    passages: list[Retrieved] = field(default_factory=list)
+    retrieval_ms: float = 0.0
+    generation_ms: float = 0.0
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
 
 
-def ollama_chat(messages: list[dict[str, str]]) -> str:
+def ollama_chat(messages: list[dict[str, str]]) -> Reply:
     """One non-streaming chat turn with `OLLAMA_MODEL`, temperature 0."""
     body = {
         "model": os.getenv("OLLAMA_MODEL", "gpt-oss:120b"),
@@ -56,7 +71,12 @@ def ollama_chat(messages: list[dict[str, str]]) -> str:
         "stream": False,
         "options": {"temperature": 0},
     }
-    return ollama.post("/api/chat", body)["message"]["content"]
+    response = ollama.post("/api/chat", body)
+    return Reply(
+        response["message"]["content"],
+        response.get("prompt_eval_count", 0),
+        response.get("eval_count", 0),
+    )
 
 
 def _prompt(question: str, passages: list[Retrieved]) -> list[dict[str, str]]:
@@ -86,25 +106,38 @@ def answer(
     chat: Chat = ollama_chat,
 ) -> Answer:
     """Answer `question` from the indexed corpus, citing the passages used."""
+    started = time.perf_counter()
     try:
         passages = (retriever or get_retriever()).query(question, top_k=top_k)
     except Exception as exc:
         raise RetrievalError(str(exc)) from exc
+    retrieved = time.perf_counter()
+    timing = {"passages": passages, "retrieval_ms": (retrieved - started) * 1000}
     if not passages:
-        return Answer(INSUFFICIENT, [], "insufficient_context")
+        return Answer(INSUFFICIENT, [], "insufficient_context", **timing)
 
     try:
-        # gpt-oss sometimes cites with full-width brackets; normalize to [n].
-        reply = chat(_prompt(question, passages)).strip()
-        reply = reply.replace("【", "[").replace("】", "]")
+        reply = chat(_prompt(question, passages))
     except Exception as exc:  # noqa: BLE001 - the passages are still evidence
         return Answer(
-            f"The language model is unavailable: {exc}", passages, "llm_unavailable"
+            f"The language model is unavailable: {exc}",
+            passages,
+            "llm_unavailable",
+            **timing,
+            generation_ms=(time.perf_counter() - retrieved) * 1000,
         )
+    usage = {
+        **timing,
+        "generation_ms": (time.perf_counter() - retrieved) * 1000,
+        "prompt_tokens": reply.prompt_tokens,
+        "completion_tokens": reply.completion_tokens,
+    }
+    # gpt-oss sometimes cites with full-width brackets; normalize to [n].
+    text = reply.text.strip().replace("【", "[").replace("】", "]")
 
-    if NO_CONTEXT in reply:
+    if NO_CONTEXT in text:
         # Nothing backs a refusal, so no sources; keep the model's sentence,
         # which is in the question's language.
-        sentence = reply.split(NO_CONTEXT, 1)[1].lstrip(" :").strip()
-        return Answer(sentence or INSUFFICIENT, [], "insufficient_context")
-    return Answer(reply, _cited(reply, passages))
+        sentence = text.split(NO_CONTEXT, 1)[1].lstrip(" :").strip()
+        return Answer(sentence or INSUFFICIENT, [], "insufficient_context", **usage)
+    return Answer(text, _cited(text, passages), **usage)

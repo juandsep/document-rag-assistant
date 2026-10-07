@@ -129,6 +129,8 @@ class QdrantRetriever:
                 url=os.environ["QDRANT_URL"],
                 api_key=os.environ["QDRANT_API_KEY"],
                 cloud_inference=True,
+                # Skips a version round trip on every cold start.
+                check_compatibility=False,
             )
         return self._client
 

@@ -29,7 +29,9 @@ def test_answer_returns_only_the_cited_passages_and_prompts_from_them():
 
     def chat(messages):
         seen["messages"] = messages
-        return "You have 30 days [1]."
+        return chain.Reply(
+            "You have 30 days [1].", prompt_tokens=120, completion_tokens=9
+        )
 
     result = chain.answer(
         "How long for a refund?", retriever=FakeRetriever(), chat=chat
@@ -37,6 +39,8 @@ def test_answer_returns_only_the_cited_passages_and_prompts_from_them():
 
     assert result.status == "ok"
     assert result.text == "You have 30 days [1]."
+    assert (result.prompt_tokens, result.completion_tokens) == (120, 9)
+    assert len(result.passages) == 2 and result.retrieval_ms >= 0
     assert [s.doc_id for s in result.sources] == ["refunds.txt"]
     user = seen["messages"][1]["content"]
     assert "[1] (refunds.txt)" in user and "[2] (shipping.txt)" in user
@@ -44,20 +48,26 @@ def test_answer_returns_only_the_cited_passages_and_prompts_from_them():
 
 
 def test_answer_reads_full_width_citations():
-    result = chain.answer("q", retriever=FakeRetriever(), chat=lambda m: "No【1】.")
+    result = chain.answer(
+        "q", retriever=FakeRetriever(), chat=lambda m: chain.Reply("No【1】.")
+    )
     assert result.text == "No[1]."
     assert [s.doc_id for s in result.sources] == ["refunds.txt"]
 
 
 def test_answer_without_citations_keeps_every_passage():
-    result = chain.answer("q", retriever=FakeRetriever(), chat=lambda m: "30 days.")
+    result = chain.answer(
+        "q", retriever=FakeRetriever(), chat=lambda m: chain.Reply("30 days.")
+    )
     assert len(result.sources) == 2
 
 
 def test_answer_reports_insufficient_context_instead_of_improvising():
     reply = f"{chain.NO_CONTEXT}: Los documentos no lo cubren."
     result = chain.answer(
-        "¿Quién es el CEO?", retriever=FakeRetriever(), chat=lambda m: reply
+        "¿Quién es el CEO?",
+        retriever=FakeRetriever(),
+        chat=lambda m: chain.Reply(reply),
     )
     assert result.status == "insufficient_context"
     assert result.text == "Los documentos no lo cubren."
@@ -66,7 +76,7 @@ def test_answer_reports_insufficient_context_instead_of_improvising():
 
 def test_a_bare_no_context_reply_falls_back_to_the_default_message():
     result = chain.answer(
-        "q", retriever=FakeRetriever(), chat=lambda m: chain.NO_CONTEXT
+        "q", retriever=FakeRetriever(), chat=lambda m: chain.Reply(chain.NO_CONTEXT)
     )
     assert result.text == chain.INSUFFICIENT
 

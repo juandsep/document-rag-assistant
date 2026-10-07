@@ -6,7 +6,7 @@
   ],
   "timezone": "browser",
   "schemaVersion": 41,
-  "version": 1,
+  "version": 2,
   "refresh": "5m",
   "time": {
     "from": "now-24h",
@@ -375,6 +375,236 @@
           "label": "${PROP('Dim.ServiceName')}",
           "id": "",
           "expression": ""
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "type": "row",
+      "title": "Per query (rag_query log line, Logs Insights)",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 16
+      },
+      "panels": []
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Query latency by stage",
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 17
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 15
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "queryMode": "Logs",
+          "region": "us-east-1",
+          "id": "",
+          "queryLanguage": "CWLI",
+          "logGroupNames": [
+            "/aws/lambda/$function"
+          ],
+          "expression": "filter event = \"rag_query\" | stats pct(latency_ms, 50) as total_p50, pct(latency_ms, 95) as total_p95, pct(retrieval_ms, 95) as retrieval_p95, pct(generation_ms, 95) as generation_p95 by bin(5m)",
+          "statsGroups": [
+            "bin(5m)"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Answers by status",
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 17
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 15
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "queryMode": "Logs",
+          "region": "us-east-1",
+          "id": "",
+          "queryLanguage": "CWLI",
+          "logGroupNames": [
+            "/aws/lambda/$function"
+          ],
+          "expression": "filter event = \"rag_query\" | stats count(*) as answers by status, bin(1h)",
+          "statsGroups": [
+            "status",
+            "bin(1h)"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "LLM tokens per hour",
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 25
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 15
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "queryMode": "Logs",
+          "region": "us-east-1",
+          "id": "",
+          "queryLanguage": "CWLI",
+          "logGroupNames": [
+            "/aws/lambda/$function"
+          ],
+          "expression": "filter event = \"rag_query\" | stats sum(prompt_tokens) as prompt, sum(completion_tokens) as completion by bin(1h)",
+          "statsGroups": [
+            "bin(1h)"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Top retrieval score (drift watch)",
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 25
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 15
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "cloudwatch"
+          },
+          "queryMode": "Logs",
+          "region": "us-east-1",
+          "id": "",
+          "queryLanguage": "CWLI",
+          "logGroupNames": [
+            "/aws/lambda/$function"
+          ],
+          "expression": "filter event = \"rag_query\" and passages > 0 | stats avg(top_score) as avg_top, min(top_score) as min_top by bin(1h)",
+          "statsGroups": [
+            "bin(1h)"
+          ]
         }
       ]
     }

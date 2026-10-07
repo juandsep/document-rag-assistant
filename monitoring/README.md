@@ -13,14 +13,20 @@ firing.
 |---|---|
 | Invocations, errors, throttles, duration (p50/p95/max), concurrency | `AWS/Lambda` built-in metrics |
 | Estimated charges this month, by AWS service | `AWS/Billing` (`us-east-1`, every ~6 h) |
+| Latency by stage (total p50/p95, retrieval p95, generation p95) | `rag_query` log line, Logs Insights |
+| Answers by status (`ok`, `insufficient_context`, `llm_unavailable`, `retrieval_error`) | `rag_query` log line |
+| LLM prompt and completion tokens per hour | `rag_query` log line |
+| Top retrieval score, average and minimum (drift watch) | `rag_query` log line |
 
 Alarms: more than 5 errors in 5 min; any throttle (the `reserved_concurrency`
 spend cap is being hit); p95 duration above 3 s for 15 min. The budget in
 `infra/main.tf` mails separately when the month's forecast passes 80%.
 
-Per-query series (latency split by retrieval and generation, top-k scores,
-tokens, LLM cost) arrive with F5: the API will write one JSON log line per
-query and the dashboard will read it with Logs Insights.
+The API writes one JSON line per query (`src/rag/monitoring.py`); on Lambda it
+lands in the function's log group and the per-query panels read it with Logs
+Insights, which bills about $0.005 per GB scanned. There is no LLM cost series:
+Ollama Cloud's free plan has no per-token price, so tokens are the usage to
+watch.
 
 ## Run Grafana
 
