@@ -184,6 +184,9 @@ locals {
     AWS_LWA_PORT                    = "8000"
     AWS_LWA_READINESS_CHECK_PATH    = "/health"
     AWS_LWA_READINESS_CHECK_TIMEOUT = "5"
+    # Pass response bodies through as they are written, so /query/stream
+    # reaches the reader piece by piece; plain JSON responses are unaffected.
+    AWS_LWA_INVOKE_MODE = "response_stream"
   }
 }
 

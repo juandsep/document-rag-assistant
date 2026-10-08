@@ -5,7 +5,7 @@ Terraform (`aws` `~> 6.0`) provisioning the resources the service needs:
 | Resource | Purpose |
 |---|---|
 | AWS Lambda (container image) | runs the FastAPI app unchanged, through the Lambda Web Adapter |
-| Lambda Function URL | HTTPS entry point with no load balancer and no domain of your own |
+| Lambda Function URL | HTTPS entry point with no load balancer and no domain of your own; `RESPONSE_STREAM` invoke mode so `/query/stream` reaches the reader as it is written |
 | Amazon ECR | image registry CI pushes to |
 | SSM Parameter Store (SecureString) | Qdrant and Ollama Cloud API keys |
 | IAM roles | function role (own parameter read only) and deploy role (GitHub Actions through OIDC, no stored access keys) |

@@ -14,6 +14,7 @@ from contextlib import asynccontextmanager
 from typing import Any, Literal
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from rag import chain, monitoring
@@ -150,6 +151,46 @@ async def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+def _log_answer(
+    query_id: str, result: chain.Answer, started: float, top_k: int
+) -> None:
+    monitoring.log_query(
+        query_id=query_id,
+        status=result.status,
+        latency_ms=_ms(started),
+        retrieval_ms=round(result.retrieval_ms, 1),
+        generation_ms=round(result.generation_ms, 1),
+        top_k=top_k,
+        top_score=round(max((p.score for p in result.passages), default=0.0), 4),
+        passages=len(result.passages),
+        sources=len(result.sources),
+        prompt_tokens=result.prompt_tokens,
+        completion_tokens=result.completion_tokens,
+        model=os.getenv("OLLAMA_MODEL", "gpt-oss:120b"),
+    )
+
+
+def _response(result: chain.Answer, query_id: str) -> QueryResponse:
+    return QueryResponse(
+        answer=result.text,
+        sources=[
+            Source(doc_id=s.doc_id, text=s.text, score=s.score, page=s.page)
+            for s in result.sources
+        ],
+        status=result.status,
+        query_id=query_id,
+    )
+
+
+def _retrieve(payload: QueryRequest, started: float) -> tuple[list, float]:
+    try:
+        return chain.retrieve(payload.q, payload.top_k, _retriever())
+    except chain.RetrievalError as exc:
+        monitoring.log_query(status="retrieval_error", latency_ms=_ms(started))
+        # Answering without retrieval would produce uncited claims.
+        raise HTTPException(503, "The vector store is unavailable.") from exc
+
+
 @app.post(
     "/query",
     response_model=QueryResponse,
@@ -161,8 +202,7 @@ def query(payload: QueryRequest) -> QueryResponse:
     A sync handler on purpose: retrieval and generation block on HTTP, so
     FastAPI runs it in its threadpool instead of stalling the event loop.
     """
-    started = time.perf_counter()
-    query_id = uuid.uuid4().hex
+    started, query_id = time.perf_counter(), uuid.uuid4().hex
     try:
         result = chain.answer(
             payload.q,
@@ -174,29 +214,38 @@ def query(payload: QueryRequest) -> QueryResponse:
         monitoring.log_query(status="retrieval_error", latency_ms=_ms(started))
         # Answering without retrieval would produce uncited claims.
         raise HTTPException(503, "The vector store is unavailable.") from exc
-    monitoring.log_query(
-        query_id=query_id,
-        status=result.status,
-        latency_ms=_ms(started),
-        retrieval_ms=round(result.retrieval_ms, 1),
-        generation_ms=round(result.generation_ms, 1),
-        top_k=payload.top_k,
-        top_score=round(max((p.score for p in result.passages), default=0.0), 4),
-        passages=len(result.passages),
-        sources=len(result.sources),
-        prompt_tokens=result.prompt_tokens,
-        completion_tokens=result.completion_tokens,
-        model=os.getenv("OLLAMA_MODEL", "gpt-oss:120b"),
-    )
-    return QueryResponse(
-        answer=result.text,
-        sources=[
-            Source(doc_id=s.doc_id, text=s.text, score=s.score, page=s.page)
-            for s in result.sources
-        ],
-        status=result.status,
-        query_id=query_id,
-    )
+    _log_answer(query_id, result, started, payload.top_k)
+    return _response(result, query_id)
+
+
+@app.post(
+    "/query/stream",
+    dependencies=[Depends(require_api_key), Depends(rate_limit)],
+)
+def query_stream(payload: QueryRequest) -> StreamingResponse:
+    """The same answer as `/query`, streamed as NDJSON while it is written.
+
+    Lines are `{"type": "token", "text": ...}` for each piece of the answer,
+    then one `{"type": "done", ...}` with the `/query` response body. Retrieval
+    runs first, so a vector-store outage is still a plain `503`. On Lambda the
+    Function URL must use the RESPONSE_STREAM invoke mode.
+    """
+    started, query_id = time.perf_counter(), uuid.uuid4().hex
+    passages, retrieval_ms = _retrieve(payload, started)
+
+    def lines():
+        stream = chain.stream_answer(
+            payload.q, passages, retrieval_ms, chain.ollama_chat_stream
+        )
+        for item in stream:
+            if isinstance(item, str):
+                yield json.dumps({"type": "token", "text": item}) + "\n"
+            else:
+                _log_answer(query_id, item, started, payload.top_k)
+                done = _response(item, query_id).model_dump()
+                yield json.dumps({"type": "done", **done}) + "\n"
+
+    return StreamingResponse(lines(), media_type="application/x-ndjson")
 
 
 @app.post(

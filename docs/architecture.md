@@ -32,6 +32,16 @@ POST /query { q }
 4. The response carries the passages the answer cites, so a reader can verify
    every claim.
 
+`POST /query/stream` gives the same answer as NDJSON while it is written:
+`{"type": "token", "text": ...}` lines, then one `{"type": "done", ...}` with
+the `/query` body. Retrieval runs before the stream opens, so an outage is
+still a plain `503`. A refusal is never streamed: nothing is shown until the
+first characters rule out `NO_CONTEXT`. On Lambda this needs the Function URL
+in `RESPONSE_STREAM` mode and `AWS_LWA_INVOKE_MODE=response_stream`. With
+`gpt-oss` the visible text starts late (it reasons first: first token at
+~1.25 s of 1.4 s on a short answer), so streaming pays off on longer answers;
+the UI uses it, `/query` stays for evaluation and plain clients.
+
 There is no fixed similarity threshold: `multilingual-e5-small` puts related
 and unrelated passages within a few hundredths of each other (0.84 against
 0.87 on the test corpus), so a cut-off would either drop good passages or let
