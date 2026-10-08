@@ -53,7 +53,8 @@ new image through GitHub Actions and OIDC, with no stored AWS keys.
 2. **Generate.** The model receives only those passages, numbered `[1]..[k]`,
    with rules: cite every claim, answer in the question's language, deduce
    what the passages imply, and reply `NO_CONTEXT` when they do not cover it.
-3. **Answer.** The API returns the answer, the passages it cited (document,
+3. **Answer.** The answer streams to the page as it is written
+   (`/query/stream`); the last line brings the passages it cited (document,
    page, score) and a status: `ok`, `insufficient_context` or
    `llm_unavailable`. A Qdrant outage is a `503`: answering without retrieval
    would produce uncited claims.

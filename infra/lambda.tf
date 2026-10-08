@@ -76,6 +76,8 @@ resource "aws_iam_role_policy" "function" {
 resource "aws_lambda_function_url" "api" {
   function_name      = aws_lambda_function.api.function_name
   authorization_type = var.function_url_auth_type
+  # Must match AWS_LWA_INVOKE_MODE: the URL streams what the adapter sends.
+  invoke_mode = "RESPONSE_STREAM"
 
   cors {
     allow_origins = ["*"]

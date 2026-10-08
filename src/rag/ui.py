@@ -10,6 +10,7 @@ RAG_API_KEY as root-level secrets, which it exposes as environment variables).
 
 from __future__ import annotations
 
+import json
 import os
 import time
 
@@ -190,20 +191,34 @@ with ask_tab:
     elif asked:
         st.session_state.pop("last", None)
         try:
-            with st.spinner("Searching the documents and writing the answer…"):
-                started = time.perf_counter()
+            started = time.perf_counter()
+            with st.spinner("Searching the documents…"):
                 response = requests.post(
-                    f"{API_URL}/query",
+                    f"{API_URL}/query/stream",
                     json={"q": question, "top_k": top_k},
                     headers=HEADERS,
                     timeout=60,
+                    stream=True,
                 )
-                elapsed = time.perf_counter() - started
             if response.status_code == 429:
                 raise RateLimited(response.headers.get("Retry-After", "60"))
             response.raise_for_status()
+            # The answer appears as it is written; the final line carries
+            # what /query returns (sources, status, query_id).
+            live, text, final = st.empty(), "", None
+            for line in response.iter_lines():
+                event = json.loads(line)
+                if event["type"] == "token":
+                    text += event["text"]
+                    live.markdown(text + " ▌")
+                else:
+                    final = event
+            live.empty()
+            if final is None:
+                raise RuntimeError("the answer stream ended early")
             # Kept in the session: rating the answer reruns the page.
-            st.session_state["last"] = {"payload": response.json(), "elapsed": elapsed}
+            elapsed = time.perf_counter() - started
+            st.session_state["last"] = {"payload": final, "elapsed": elapsed}
         except RateLimited as wait:
             st.warning(f"The demo is busy; try again in {wait} seconds.")
         except Exception as exc:  # noqa: BLE001 - surface any failure to the operator

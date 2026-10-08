@@ -1,5 +1,6 @@
 """Tests for the Streamlit UI, run headless with Streamlit's AppTest."""
 
+import json
 from pathlib import Path
 
 import pytest
@@ -20,13 +21,21 @@ class FakeResponse:
     def json(self):
         return self.payload
 
+    def iter_lines(self):
+        # /query/stream: the answer in two pieces, then the full response.
+        answer = self.payload.get("answer", "")
+        half = len(answer) // 2
+        for piece in (answer[:half], answer[half:]):
+            yield json.dumps({"type": "token", "text": piece})
+        yield json.dumps({"type": "done", **self.payload})
+
 
 @pytest.fixture
 def api(monkeypatch):
     calls = []
 
     def respond_with(payload):
-        def post(url, json, headers, timeout):
+        def post(url, json, headers, timeout, stream=False):
             calls.append({"url": url, "json": json, "headers": headers})
             return FakeResponse(payload)
 

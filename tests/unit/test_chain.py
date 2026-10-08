@@ -137,3 +137,57 @@ def test_load_secrets_fills_missing_keys_and_skips_placeholders(monkeypatch):
 )
 def test_question_language(question, language):
     assert chain.question_language(question) == language
+
+
+def _streamer(*pieces, error=None):
+    def chat_stream(messages):
+        yield from pieces
+        if error:
+            raise error
+        yield chain.Reply("".join(pieces), 50, 7)
+
+    return chat_stream
+
+
+def test_stream_answer_yields_the_text_then_the_answer():
+    items = list(
+        chain.stream_answer(
+            "q", PASSAGES, 12.0, _streamer("You have ", "30 days【1】.")
+        )
+    )
+
+    assert items[:-1] == ["You have ", "30 days[1]."]
+    final = items[-1]
+    assert final.text == "You have 30 days[1]." and final.status == "ok"
+    assert [s.doc_id for s in final.sources] == ["refunds.txt"]
+    assert (final.retrieval_ms, final.prompt_tokens) == (12.0, 50)
+
+
+def test_stream_answer_never_shows_a_refusal_marker():
+    items = list(
+        chain.stream_answer(
+            "q", PASSAGES, 0, _streamer("NO_", "CONTEXT: ", "Not covered.")
+        )
+    )
+
+    assert len(items) == 1
+    assert items[0].status == "insufficient_context" and items[0].text == "Not covered."
+
+
+def test_stream_answer_keeps_the_passages_when_the_model_fails():
+    items = list(
+        chain.stream_answer(
+            "q", PASSAGES, 0, _streamer("You ", error=TimeoutError("slow"))
+        )
+    )
+
+    assert items[0] == "You "
+    assert items[-1].status == "llm_unavailable" and len(items[-1].sources) == 2
+
+
+def test_stream_answer_without_passages_refuses_at_once():
+    def never(messages):
+        raise AssertionError("no passages, no model call")
+
+    [final] = chain.stream_answer("q", [], 0, never)
+    assert final.status == "insufficient_context"

@@ -145,3 +145,30 @@ def test_feedback_needs_the_api_key(monkeypatch):
     monkeypatch.setenv("API_KEY", "s3cret")
     payload = {"query_id": "a" * 32, "rating": "up"}
     assert client.post("/feedback", json=payload).status_code == 401
+
+
+def test_query_stream_sends_tokens_then_the_full_answer(wired, monkeypatch, capsys):
+    wired(FakeRetriever())
+
+    def chat_stream(messages):
+        yield "You have "
+        yield "30 days [1]."
+        yield chain.Reply("You have 30 days [1].", 100, 8)
+
+    monkeypatch.setattr(chain, "ollama_chat_stream", chat_stream)
+
+    response = client.post("/query/stream", json={"q": "Refund window?"})
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("application/x-ndjson")
+    lines = [json.loads(line) for line in response.text.splitlines()]
+    assert [line["text"] for line in lines[:-1]] == ["You have ", "30 days [1]."]
+    done = lines[-1]
+    assert done["type"] == "done" and done["answer"] == "You have 30 days [1]."
+    assert done["sources"][0]["doc_id"] == "refunds.txt"
+    assert '"query_id": "' + done["query_id"] in capsys.readouterr().out
+
+
+def test_query_stream_maps_a_vector_store_outage_to_503(wired):
+    wired(FakeRetriever(error=ConnectionError("down")))
+    assert client.post("/query/stream", json={"q": "hi"}).status_code == 503

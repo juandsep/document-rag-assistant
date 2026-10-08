@@ -10,7 +10,7 @@ from __future__ import annotations
 import os
 import re
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 
 from rag import ollama
@@ -113,6 +113,72 @@ def _cited(reply: str, passages: list[Retrieved]) -> list[Retrieved]:
     return cited or passages
 
 
+def ollama_chat_stream(messages: list[dict[str, str]]) -> Iterator[str | Reply]:
+    """Stream a chat turn: each piece of reply text, then the whole `Reply`.
+
+    gpt-oss streams its reasoning as `thinking` before the reply; only the
+    reply (`content`) is yielded.
+    """
+    body = {
+        "model": os.getenv("OLLAMA_MODEL", "gpt-oss:120b"),
+        "messages": messages,
+        "stream": True,
+        "options": {"temperature": 0},
+    }
+    text = ""
+    for line in ollama.post_stream("/api/chat", body):
+        if piece := line.get("message", {}).get("content", ""):
+            text += piece
+            yield piece
+        if line.get("done"):
+            yield Reply(
+                text, line.get("prompt_eval_count", 0), line.get("eval_count", 0)
+            )
+
+
+def retrieve(
+    question: str, top_k: int = 5, retriever: Retriever | None = None
+) -> tuple[list[Retrieved], float]:
+    """The top-k passages and how long retrieval took, in milliseconds."""
+    started = time.perf_counter()
+    try:
+        passages = (retriever or get_retriever()).query(question, top_k=top_k)
+    except Exception as exc:
+        raise RetrievalError(str(exc)) from exc
+    return passages, (time.perf_counter() - started) * 1000
+
+
+def _normalize(text: str) -> str:
+    # gpt-oss sometimes cites with full-width brackets; normalize to [n].
+    return text.replace("【", "[").replace("】", "]")
+
+
+def _finish(reply: Reply, passages: list[Retrieved], timing: dict) -> Answer:
+    """Turn the model's reply into an answer: refusal or cited sources."""
+    usage = {
+        **timing,
+        "prompt_tokens": reply.prompt_tokens,
+        "completion_tokens": reply.completion_tokens,
+    }
+    text = _normalize(reply.text.strip())
+    if NO_CONTEXT in text:
+        # Nothing backs a refusal, so no sources; keep the model's sentence,
+        # which is in the question's language.
+        sentence = text.split(NO_CONTEXT, 1)[1].lstrip(" :").strip()
+        return Answer(sentence or INSUFFICIENT, [], "insufficient_context", **usage)
+    return Answer(text, _cited(text, passages), **usage)
+
+
+def _unavailable(exc: Exception, passages: list[Retrieved], timing: dict) -> Answer:
+    # The passages are still evidence, so they go back with the error.
+    return Answer(
+        f"The language model is unavailable: {exc}",
+        passages,
+        "llm_unavailable",
+        **timing,
+    )
+
+
 def answer(
     question: str,
     top_k: int = 5,
@@ -120,38 +186,60 @@ def answer(
     chat: Chat = ollama_chat,
 ) -> Answer:
     """Answer `question` from the indexed corpus, citing the passages used."""
-    started = time.perf_counter()
-    try:
-        passages = (retriever or get_retriever()).query(question, top_k=top_k)
-    except Exception as exc:
-        raise RetrievalError(str(exc)) from exc
-    retrieved = time.perf_counter()
-    timing = {"passages": passages, "retrieval_ms": (retrieved - started) * 1000}
+    passages, retrieval_ms = retrieve(question, top_k, retriever)
+    timing = {"passages": passages, "retrieval_ms": retrieval_ms}
     if not passages:
         return Answer(INSUFFICIENT, [], "insufficient_context", **timing)
-
+    generating = time.perf_counter()
     try:
         reply = chat(_prompt(question, passages))
     except Exception as exc:  # noqa: BLE001 - the passages are still evidence
-        return Answer(
-            f"The language model is unavailable: {exc}",
-            passages,
-            "llm_unavailable",
-            **timing,
-            generation_ms=(time.perf_counter() - retrieved) * 1000,
-        )
-    usage = {
-        **timing,
-        "generation_ms": (time.perf_counter() - retrieved) * 1000,
-        "prompt_tokens": reply.prompt_tokens,
-        "completion_tokens": reply.completion_tokens,
-    }
-    # gpt-oss sometimes cites with full-width brackets; normalize to [n].
-    text = reply.text.strip().replace("【", "[").replace("】", "]")
+        timing["generation_ms"] = (time.perf_counter() - generating) * 1000
+        return _unavailable(exc, passages, timing)
+    timing["generation_ms"] = (time.perf_counter() - generating) * 1000
+    return _finish(reply, passages, timing)
 
-    if NO_CONTEXT in text:
-        # Nothing backs a refusal, so no sources; keep the model's sentence,
-        # which is in the question's language.
-        sentence = text.split(NO_CONTEXT, 1)[1].lstrip(" :").strip()
-        return Answer(sentence or INSUFFICIENT, [], "insufficient_context", **usage)
-    return Answer(text, _cited(text, passages), **usage)
+
+def stream_answer(
+    question: str,
+    passages: list[Retrieved],
+    retrieval_ms: float = 0.0,
+    chat_stream: Callable[[list[dict[str, str]]], Iterator[str | Reply]] = (
+        ollama_chat_stream
+    ),
+) -> Iterator[str | Answer]:
+    """Yield the visible answer text as it is generated, then the `Answer`.
+
+    A refusal starts with NO_CONTEXT, so nothing is shown until the first
+    characters rule it out; the final `Answer` carries the refusal sentence,
+    the cited sources and the timings either way.
+    """
+    timing = {"passages": passages, "retrieval_ms": retrieval_ms}
+    if not passages:
+        yield Answer(INSUFFICIENT, [], "insufficient_context", **timing)
+        return
+    generating = time.perf_counter()
+    pending, decided, refusing, reply = "", False, False, None
+    try:
+        for item in chat_stream(_prompt(question, passages)):
+            if isinstance(item, Reply):
+                reply = item
+            elif decided:
+                if not refusing:
+                    yield _normalize(item)
+            else:
+                pending += item
+                head = pending.lstrip()
+                if len(head) >= len(NO_CONTEXT) or not NO_CONTEXT.startswith(head):
+                    decided, refusing = True, head.startswith(NO_CONTEXT)
+                    if not refusing:
+                        yield _normalize(head)
+    except Exception as exc:  # noqa: BLE001 - the passages are still evidence
+        timing["generation_ms"] = (time.perf_counter() - generating) * 1000
+        yield _unavailable(exc, passages, timing)
+        return
+    timing["generation_ms"] = (time.perf_counter() - generating) * 1000
+    if reply is None:  # the stream ended without its final line
+        yield _unavailable(RuntimeError("incomplete stream"), passages, timing)
+        return
+    yield _finish(reply, passages, timing)
