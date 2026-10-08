@@ -17,6 +17,7 @@ firing.
 | Answers by status (`ok`, `insufficient_context`, `llm_unavailable`, `retrieval_error`, `rate_limited`) | `rag_query` log line |
 | LLM prompt and completion tokens per hour | `rag_query` log line |
 | Top retrieval score, average and minimum (drift watch) | `rag_query` log line |
+| Reader ratings, thumbs up and down per day | `rag_feedback` log line (`POST /feedback`), joined to its question by `query_id` |
 
 Alarms: more than 5 errors in 5 min; any throttle (the `reserved_concurrency`
 spend cap is being hit); p95 duration above 3 s for 15 min. The budget in

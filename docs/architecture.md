@@ -85,9 +85,12 @@ uv run --env-file .env python scripts/prune_versions.py --yes    # delete it
 
 Each query writes one `rag_query` JSON line (`monitoring.log_query`): status,
 total, retrieval and generation latency, top score, passages and sources,
-prompt and completion tokens, model. On Lambda it lands in CloudWatch Logs and
-the Grafana dashboard reads it with Logs Insights; nothing on the request path
-calls a metrics service.
+prompt and completion tokens, model, and a `query_id` the response also
+returns. A reader's rating (`POST /feedback`, thumbs up or down from the UI)
+writes a `rag_feedback` line with the same `query_id`, so a downvoted answer
+leads back to its question, latency and scores. On Lambda both land in
+CloudWatch Logs and the Grafana dashboard reads them with Logs Insights;
+nothing on the request path calls a metrics service.
 
 On top of that, `scripts/evaluate.py` turns "the answers feel better" into a
 number attached to a pull request. It scores 56 labelled questions

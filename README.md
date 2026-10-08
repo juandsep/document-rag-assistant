@@ -58,7 +58,9 @@ new image through GitHub Actions and OIDC, with no stored AWS keys.
    `llm_unavailable`. A Qdrant outage is a `503`: answering without retrieval
    would produce uncited claims.
 4. **Measure.** One JSON line per query (latency by stage, top score, tokens)
-   feeds the Grafana dashboard through CloudWatch Logs Insights.
+   feeds the Grafana dashboard through CloudWatch Logs Insights, and readers
+   rate each answer 👍/👎 (`POST /feedback`), logged against the same
+   `query_id`.
 
 Warm, a question takes about 0.6 s inside the Lambda, almost all of it
 generation; a cold start adds 1.3–1.7 s.
