@@ -156,6 +156,8 @@ git-ignored `.env`.
 | `EMBEDDING_MODEL` | embedding model the `local` backend asks Ollama for |
 | `APP_SECRET_PARAMETER` | SecureString whose JSON keys the API copies into its environment at startup (Lambda only; local runs use `.env`) |
 | `API_KEY` | key `/query` demands in `X-API-Key` (SecureString on Lambda; unset locally leaves the API open) |
+| `RATE_LIMIT_PER_MINUTE` | `/query` calls per client IP per minute (default 30, `0` disables); over it the API answers `429` with `Retry-After` |
+| `RAG_SESSION_LIMIT` | questions per minute per browser session in the Streamlit UI (default 6) |
 | `RAG_API_URL` / `RAG_API_KEY` | API base URL and key the Streamlit UI sends |
 
 ## Conventions

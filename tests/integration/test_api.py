@@ -94,3 +94,20 @@ def test_a_deployed_function_without_a_key_refuses(wired, monkeypatch):
     monkeypatch.delenv("API_KEY", raising=False)
     monkeypatch.setenv("APP_SECRET_PARAMETER", "/rag/app")
     assert client.post("/query", json={"q": "hi"}).status_code == 503
+
+
+def test_query_is_rate_limited_per_client(wired, monkeypatch):
+    wired(FakeRetriever())
+    monkeypatch.setenv("RATE_LIMIT_PER_MINUTE", "2")
+    monkeypatch.setattr(api, "_recent", {})
+    first = {"X-Forwarded-For": "203.0.113.7"}
+    other = {"X-Forwarded-For": "198.51.100.9"}
+
+    codes = [
+        client.post("/query", json={"q": "hi"}, headers=first).status_code
+        for _ in range(3)
+    ]
+    assert codes == [200, 200, 429]
+    limited = client.post("/query", json={"q": "hi"}, headers=first)
+    assert int(limited.headers["Retry-After"]) <= 61
+    assert client.post("/query", json={"q": "hi"}, headers=other).status_code == 200

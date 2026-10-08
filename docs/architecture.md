@@ -191,6 +191,9 @@ question, fixed in the reference.
   answer says so in the question's language, with no sources, and `status` is
   `insufficient_context`, rather than letting
   the model improvise.
+- **Too many questions** — over `RATE_LIMIT_PER_MINUTE` per client IP the API
+  answers `429` with `Retry-After` before retrieving anything; the UI shows when
+  to retry and also caps each visitor at 6 questions a minute.
 - **LLM unavailable** — the retrieved passages are returned with the error and
   `status: llm_unavailable`, so the caller still gets the evidence.
 
