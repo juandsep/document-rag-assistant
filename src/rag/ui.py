@@ -18,6 +18,10 @@ import streamlit as st
 
 API_URL = os.getenv("RAG_API_URL", "http://localhost:8000").rstrip("/")
 API_KEY = os.getenv("RAG_API_KEY", "")
+# Questions per minute per browser session. The API also limits per client
+# IP, but every visitor of the hosted demo shares the Streamlit host's IP, so
+# this keeps one visitor from using up everyone's share.
+SESSION_LIMIT = int(os.getenv("RAG_SESSION_LIMIT", "6"))
 REPO = "https://github.com/juandsep/document-rag-assistant"
 DIAGRAM = (
     "https://raw.githubusercontent.com/juandsep/document-rag-assistant/main/"
@@ -59,6 +63,20 @@ CORPUS = [
         "FAQ: address changes, cancellations, VAT",
     ),
 ]
+
+
+class RateLimited(Exception):
+    """The API answered 429; the message is its Retry-After."""
+
+
+def _within_session_limit() -> bool:
+    """Record one question for this session unless the minute's quota is used."""
+    now = time.time()
+    recent = [t for t in st.session_state.get("asked", []) if now - t < 60]
+    allowed = len(recent) < SESSION_LIMIT
+    st.session_state["asked"] = recent + [now] if allowed else recent
+    return allowed
+
 
 st.set_page_config(page_title="Document RAG Assistant", page_icon="📚", layout="wide")
 
@@ -103,7 +121,13 @@ with ask_tab:
         help="How many passages the search hands to the model.",
     )
 
-    if st.button("Ask", type="primary") and question:
+    asked = st.button("Ask", type="primary") and question
+    if asked and not _within_session_limit():
+        st.warning(
+            f"That is {SESSION_LIMIT} questions in the last minute; "
+            "wait a moment before asking again."
+        )
+    elif asked:
         try:
             with st.spinner("Searching the documents and writing the answer…"):
                 started = time.perf_counter()
@@ -114,8 +138,12 @@ with ask_tab:
                     timeout=60,
                 )
                 elapsed = time.perf_counter() - started
+            if response.status_code == 429:
+                raise RateLimited(response.headers.get("Retry-After", "60"))
             response.raise_for_status()
             payload = response.json()
+        except RateLimited as wait:
+            st.warning(f"The demo is busy; try again in {wait} seconds.")
         except Exception as exc:  # noqa: BLE001 - surface any failure to the operator
             st.error(f"Query failed: {exc}")
         else:

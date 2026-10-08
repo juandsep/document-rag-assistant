@@ -7,11 +7,12 @@ import hmac
 import json
 import os
 import time
+from collections import deque
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
 
-from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from rag import chain, monitoring
@@ -58,6 +59,40 @@ def require_api_key(x_api_key: str | None = Header(default=None)) -> None:
         return
     if not (x_api_key and hmac.compare_digest(x_api_key, expected)):
         raise HTTPException(401, "Missing or wrong X-API-Key header.")
+
+
+# ponytail: per-process memory. With 2 reserved Lambda executions the real
+# ceiling is up to twice the limit, and idle client entries are only pruned
+# when that client calls again; a shared store (DynamoDB) would make it exact.
+_recent: dict[str, deque[float]] = {}
+
+
+def rate_limit(request: Request) -> None:
+    """Allow `RATE_LIMIT_PER_MINUTE` queries per client IP (0 disables it).
+
+    The Streamlit demo reaches the API from its host's address, so this also
+    caps the public demo as a whole; the UI adds a per-visitor limit on top.
+    """
+    limit = int(os.getenv("RATE_LIMIT_PER_MINUTE", "30"))
+    if limit <= 0:
+        return
+    forwarded = request.headers.get("x-forwarded-for", "")
+    client = forwarded.split(",")[0].strip() or (
+        request.client.host if request.client else "unknown"
+    )
+    now = time.monotonic()
+    calls = _recent.setdefault(client, deque())
+    while calls and now - calls[0] >= 60:
+        calls.popleft()
+    if len(calls) >= limit:
+        monitoring.log_query(status="rate_limited")
+        retry = int(60 - (now - calls[0])) + 1
+        raise HTTPException(
+            429,
+            "Too many questions; try again in a minute.",
+            headers={"Retry-After": str(retry)},
+        )
+    calls.append(now)
 
 
 def _ms(started: float) -> float:
@@ -107,7 +142,9 @@ async def health() -> dict[str, str]:
 
 
 @app.post(
-    "/query", response_model=QueryResponse, dependencies=[Depends(require_api_key)]
+    "/query",
+    response_model=QueryResponse,
+    dependencies=[Depends(require_api_key), Depends(rate_limit)],
 )
 def query(payload: QueryRequest) -> QueryResponse:
     """Answer `payload.q` from the indexed corpus, citing the sources.

@@ -14,7 +14,7 @@ firing.
 | Invocations, errors, throttles, duration (p50/p95/max), concurrency | `AWS/Lambda` built-in metrics |
 | Estimated charges this month, by AWS service | `AWS/Billing` (`us-east-1`, every ~6 h) |
 | Latency by stage (total p50/p95, retrieval p95, generation p95) | `rag_query` log line, Logs Insights |
-| Answers by status (`ok`, `insufficient_context`, `llm_unavailable`, `retrieval_error`) | `rag_query` log line |
+| Answers by status (`ok`, `insufficient_context`, `llm_unavailable`, `retrieval_error`, `rate_limited`) | `rag_query` log line |
 | LLM prompt and completion tokens per hour | `rag_query` log line |
 | Top retrieval score, average and minimum (drift watch) | `rag_query` log line |
 

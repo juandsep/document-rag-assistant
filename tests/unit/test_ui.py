@@ -12,6 +12,7 @@ UI = str(Path(__file__).resolve().parents[2] / "src" / "rag" / "ui.py")
 class FakeResponse:
     def __init__(self, payload):
         self.payload = payload
+        self.status_code, self.headers = 200, {}
 
     def raise_for_status(self):
         pass
@@ -99,3 +100,27 @@ def test_the_page_explains_itself_before_any_question():
     assert app.sidebar.header[0].value == "About"
     corpus = app.table[1].value
     assert len(corpus) == 14 and {"Spanish", "English"} <= set(corpus["Language"])
+
+
+def test_a_visitor_is_limited_per_minute(api, monkeypatch):
+    monkeypatch.setenv("RAG_SESSION_LIMIT", "2")
+    calls = api({"answer": "ok [1].", "status": "ok", "sources": []})
+    app = AppTest.from_file(UI, default_timeout=30)
+    app.run()
+    for _ in range(3):
+        app.text_input[0].input("q")
+        app.button[0].click()
+        app.run()
+
+    assert len(calls) == 2
+    assert "2 questions in the last minute" in app.warning[0].value
+
+
+def test_a_busy_api_shows_when_to_retry(monkeypatch):
+    busy = FakeResponse({})
+    busy.status_code, busy.headers = 429, {"Retry-After": "17"}
+    monkeypatch.setattr(requests, "post", lambda *a, **k: busy)
+
+    app = ask("hi")
+
+    assert app.warning[0].value == "The demo is busy; try again in 17 seconds."
