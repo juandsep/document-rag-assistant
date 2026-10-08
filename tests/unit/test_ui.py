@@ -124,3 +124,23 @@ def test_a_busy_api_shows_when_to_retry(monkeypatch):
     app = ask("hi")
 
     assert app.warning[0].value == "The demo is busy; try again in 17 seconds."
+
+
+def test_a_rating_is_posted_for_the_answer(api):
+    calls = api(
+        {"answer": "30 days [1].", "status": "ok", "sources": [], "query_id": "a" * 32}
+    )
+    app = ask("¿Cuántos días tengo?")
+
+    app.get("feedback")[0].set_value(0).run()
+
+    feedback = [c for c in calls if c["url"].endswith("/feedback")]
+    assert feedback == [
+        {
+            "url": feedback[0]["url"],
+            "json": {"query_id": "a" * 32, "rating": "down"},
+            "headers": {},
+        }
+    ]
+    assert "Thanks, your rating was recorded." in [c.value for c in app.caption]
+    assert "30 days [1]." in [m.value for m in app.markdown]  # still on screen

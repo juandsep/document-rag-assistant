@@ -18,6 +18,11 @@ def log_query(**fields: Any) -> None:
     print(json.dumps({"event": "rag_query", **fields}), file=sys.stdout, flush=True)
 
 
+def log_feedback(**fields: Any) -> None:
+    """Write one `rag_feedback` event (a reader's rating of an answer)."""
+    print(json.dumps({"event": "rag_feedback", **fields}), file=sys.stdout, flush=True)
+
+
 def log_evaluation(
     metrics: dict[str, float], params: dict[str, Any], run_name: str = "retrieval-eval"
 ) -> bool:

@@ -7,10 +7,11 @@ import hmac
 import json
 import os
 import time
+import uuid
 from collections import deque
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from pydantic import BaseModel, Field
@@ -133,6 +134,14 @@ class QueryResponse(BaseModel):
         default="ok",
         description="ok | insufficient_context | llm_unavailable",
     )
+    query_id: str = Field(default="", description="Refer to it in POST /feedback")
+
+
+class Feedback(BaseModel):
+    """A reader's rating of one answer."""
+
+    query_id: str = Field(pattern=r"^[0-9a-f]{32}$")
+    rating: Literal["up", "down"]
 
 
 @app.get("/health")
@@ -153,6 +162,7 @@ def query(payload: QueryRequest) -> QueryResponse:
     FastAPI runs it in its threadpool instead of stalling the event loop.
     """
     started = time.perf_counter()
+    query_id = uuid.uuid4().hex
     try:
         result = chain.answer(
             payload.q,
@@ -165,6 +175,7 @@ def query(payload: QueryRequest) -> QueryResponse:
         # Answering without retrieval would produce uncited claims.
         raise HTTPException(503, "The vector store is unavailable.") from exc
     monitoring.log_query(
+        query_id=query_id,
         status=result.status,
         latency_ms=_ms(started),
         retrieval_ms=round(result.retrieval_ms, 1),
@@ -184,4 +195,19 @@ def query(payload: QueryRequest) -> QueryResponse:
             for s in result.sources
         ],
         status=result.status,
+        query_id=query_id,
     )
+
+
+@app.post(
+    "/feedback",
+    status_code=204,
+    dependencies=[Depends(require_api_key), Depends(rate_limit)],
+)
+def feedback(payload: Feedback) -> None:
+    """Record a reader's thumbs up or down on an answer, by its `query_id`.
+
+    It lands in the logs next to the `rag_query` line with the same id, so the
+    dashboard can count ratings and a bad answer can be traced to its query.
+    """
+    monitoring.log_feedback(query_id=payload.query_id, rating=payload.rating)

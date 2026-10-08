@@ -65,6 +65,9 @@ CORPUS = [
 ]
 
 
+HEADERS = {"X-API-Key": API_KEY} if API_KEY else {}
+
+
 class RateLimited(Exception):
     """The API answered 429; the message is its Retry-After."""
 
@@ -76,6 +79,63 @@ def _within_session_limit() -> bool:
     allowed = len(recent) < SESSION_LIMIT
     st.session_state["asked"] = recent + [now] if allowed else recent
     return allowed
+
+
+def _send_feedback(query_id: str) -> None:
+    """Post the reader's thumbs up (1) or down (0) for one answer."""
+    value = st.session_state.get(f"rating_{query_id}")
+    if value is None:
+        return
+    try:
+        requests.post(
+            f"{API_URL}/feedback",
+            json={"query_id": query_id, "rating": "up" if value == 1 else "down"},
+            headers=HEADERS,
+            timeout=10,
+        ).raise_for_status()
+        st.session_state["rated"] = query_id
+    except Exception:  # noqa: BLE001 - a lost rating must not break the page
+        st.session_state["rated"] = None
+
+
+def _show_answer(payload: dict, elapsed: float) -> None:
+    """The answer, its status, timing, sources and the rating widget."""
+    status = payload.get("status", "ok")
+    answer = payload.get("answer", "")
+    sources = payload.get("sources") or []
+    if status == "insufficient_context":
+        st.warning(answer)
+        st.caption(
+            "The documents do not cover this, so the assistant refused "
+            "rather than invent an answer."
+        )
+    elif status == "llm_unavailable":
+        st.error(answer)
+    else:
+        st.markdown(answer)
+
+    col_time, col_sources, col_status = st.columns(3)
+    col_time.metric("Response time", f"{elapsed:.1f} s")
+    col_sources.metric("Sources cited", len(sources))
+    col_status.metric("Status", status.replace("_", " "))
+
+    if query_id := payload.get("query_id"):
+        st.caption("Was this answer right?")
+        st.feedback(
+            "thumbs",
+            key=f"rating_{query_id}",
+            on_change=_send_feedback,
+            args=(query_id,),
+        )
+        if st.session_state.get("rated") == query_id:
+            st.caption("Thanks, your rating was recorded.")
+
+    if sources:
+        st.subheader("Sources")
+        for source in sources:
+            page = f", page {source['page']}" if source.get("page") else ""
+            with st.expander(f"{source['doc_id']}{page} · score {source['score']:.3f}"):
+                st.write(source["text"])
 
 
 st.set_page_config(page_title="Document RAG Assistant", page_icon="📚", layout="wide")
@@ -128,52 +188,29 @@ with ask_tab:
             "wait a moment before asking again."
         )
     elif asked:
+        st.session_state.pop("last", None)
         try:
             with st.spinner("Searching the documents and writing the answer…"):
                 started = time.perf_counter()
                 response = requests.post(
                     f"{API_URL}/query",
                     json={"q": question, "top_k": top_k},
-                    headers={"X-API-Key": API_KEY} if API_KEY else {},
+                    headers=HEADERS,
                     timeout=60,
                 )
                 elapsed = time.perf_counter() - started
             if response.status_code == 429:
                 raise RateLimited(response.headers.get("Retry-After", "60"))
             response.raise_for_status()
-            payload = response.json()
+            # Kept in the session: rating the answer reruns the page.
+            st.session_state["last"] = {"payload": response.json(), "elapsed": elapsed}
         except RateLimited as wait:
             st.warning(f"The demo is busy; try again in {wait} seconds.")
         except Exception as exc:  # noqa: BLE001 - surface any failure to the operator
             st.error(f"Query failed: {exc}")
-        else:
-            status = payload.get("status", "ok")
-            answer = payload.get("answer", "")
-            sources = payload.get("sources") or []
-            if status == "insufficient_context":
-                st.warning(answer)
-                st.caption(
-                    "The documents do not cover this, so the assistant refused "
-                    "rather than invent an answer."
-                )
-            elif status == "llm_unavailable":
-                st.error(answer)
-            else:
-                st.markdown(answer)
 
-            col_time, col_sources, col_status = st.columns(3)
-            col_time.metric("Response time", f"{elapsed:.1f} s")
-            col_sources.metric("Sources cited", len(sources))
-            col_status.metric("Status", status.replace("_", " "))
-
-            if sources:
-                st.subheader("Sources")
-                for source in sources:
-                    page = f", page {source['page']}" if source.get("page") else ""
-                    with st.expander(
-                        f"{source['doc_id']}{page} · score {source['score']:.3f}"
-                    ):
-                        st.write(source["text"])
+    if last := st.session_state.get("last"):
+        _show_answer(last["payload"], last["elapsed"])
 
 with how_tab:
     st.image(
