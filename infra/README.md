@@ -40,10 +40,12 @@ terraform plan  -var-file=terraform.tfvars
 terraform apply -var-file=terraform.tfvars
 ```
 
-`terraform.tfvars` and the state are git-ignored. State is **local**, exactly as
-in `uplift-modeling-pipeline`: move it to an S3 backend before a second person
-applies this. Use one state per environment and never reuse the production
-state locally.
+`terraform.tfvars` is git-ignored. State lives in
+`gs://jd-portfolio-shared-tfstate/document-rag-assistant` (versioned, private),
+with the other portfolio states, so `terraform init` needs
+`gcloud auth application-default login` besides the `rag` profile. The state
+holds the SSM secret body, so the bucket stays private. Use one prefix per
+environment.
 
 ## What it costs
 

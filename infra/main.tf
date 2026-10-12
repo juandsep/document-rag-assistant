@@ -1,12 +1,16 @@
 # Base AWS resources: provider, image registry, the function log group, the
 # GitHub Actions OIDC trust, the deploy role and the budget guard.
 #
-# State is local (terraform.tfstate, git-ignored), matching the reference project
-# `uplift-modeling-pipeline`. Move it to an S3 backend before a second person
-# applies this.
+# State lives in the portfolio's shared GCS state bucket (versioned, private),
+# next to the other projects' states. `terraform init` needs Google
+# application-default credentials as well as the `rag` AWS profile.
 
 terraform {
   required_version = ">= 1.6"
+  backend "gcs" {
+    bucket = "jd-portfolio-shared-tfstate"
+    prefix = "document-rag-assistant"
+  }
   required_providers {
     aws = {
       source  = "hashicorp/aws"
