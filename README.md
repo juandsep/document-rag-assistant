@@ -85,7 +85,7 @@ the RAG against the model alone. On 56 questions over 14 documents: recall@3
 | Document | What it covers |
 |---|---|
 | [docs/architecture.md](docs/architecture.md) | Request path, indexing, evaluation and the RAG comparison, failure behaviour, deployment |
-| [PLAN.md](PLAN.md) | Phases, decisions, what the first deploy took |
+| [docs/decisions.md](docs/decisions.md) | Design decisions, what the first deploy took |
 | [infra/README.md](infra/README.md) | Terraform, costs, first apply, configuration |
 | [monitoring/README.md](monitoring/README.md) | CloudWatch alarms and the Grafana dashboard |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Branch flow, commits, local checks |

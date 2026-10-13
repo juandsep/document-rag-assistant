@@ -42,3 +42,6 @@ graphify-out/
 
 # archify visual-check evidence (regenerate with archify visual-check)
 docs/diagrams/*.visual-check.*
+
+# Local planning notes (phases and status stay out of the repo)
+PLAN.md
