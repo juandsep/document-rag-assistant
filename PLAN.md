@@ -37,6 +37,17 @@ Each phase is one short-lived branch cut from `dev`, one pull request, one conce
 - End-to-end p95 latency below 3 s.
 - Full traceability: every answer links back to the retrieved source documents.
 
+## Pending
+
+Status (2026-10-12): F0–F7 done, live in `staging` only. Next, in this order:
+
+- [ ] **Production environment.** A second Terraform state prefix (`document-rag-assistant/production`) and tfvars with `environment = "production"`, its own SSM SecureString, API key and deploy role; nothing shared with staging.
+- [ ] **Deploy production from a tag.** `deploy.yml` ships only from `dev` today; add a `v*` tag (or `main`) path to the production function, with the same `/health` smoke test.
+- [ ] **UI points to production.** Streamlit Cloud runs from `main` but its `RAG_API_URL` and `RAG_API_KEY` are the staging ones; switch them once production exists.
+- [ ] **Grafana against real data.** The dashboard was built before the first deploy; check every panel against real CloudWatch metrics and Logs Insights, and link it from the central Grafana in `portfolio-infra`.
+- [ ] **English everywhere.** Translate the Spanish docstrings and messages left in `ingest.py`.
+- [x] **Remote Terraform state** in `gs://jd-portfolio-shared-tfstate/document-rag-assistant` (#58).
+
 ## Deployment
 
 Live since 2026-10-07 in `us-east-1` (account `611581418226`, environment `staging`): `POST /query` behind the `X-API-Key`, deployed by `deploy.yml` on every push to `dev`. What it took, beyond the code:
