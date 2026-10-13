@@ -6,8 +6,8 @@ Diagrams: [`diagrams/architecture.png`](diagrams/architecture.png) and
 [`diagrams/query.png`](diagrams/query.png), generated with Archify from the
 JSON next to them (`archify deliver architecture|sequence <spec>.json <out>.html`).
 
-This page describes the target design. What already works is tracked in
-[`PLAN.md`](../PLAN.md); sections marked *(planned)* do not exist in code yet.
+This page describes the target design; sections marked *(planned)* do not
+exist in code yet.
 
 ```
 POST /query { q }
